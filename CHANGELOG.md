@@ -33,6 +33,9 @@ All notable changes to this project will be documented in this file.
 - Fixed the macOS screenshot editor staying open after confirming **Delete Screenshot** or **Discard Changes**; the editor now closes as soon as the confirmation is accepted.
 - Fixed the macOS screenshot editor silently cropping saved and copied images to a selection that was no longer visible after switching to another tool.
 - Fixed crop selection drags in the macOS screenshot editor filling the undo history and leaving the editor marked as changed after the selection was removed.
+- **Tiny Clips Studio (early preview, off by default).** Studio records the screen and the camera as separate layers and opens an editor when the recording ends. Pick a background and padding, round the screen card, choose a camera shape and one of four layouts (screen only, camera bubble, side by side, camera only), drag the bubble where you want it, trim the start and end, and export an MP4. The project stays editable afterward: reopen it from **Open in Studio…** in the Clips Manager, from Recent Captures, or from the drafts list in Settings › Video. Settings › Video also sets how long projects are kept and how much disk space they may use.
+  - To try it, quit Tiny Clips and run `defaults write com.tinyclips.app studioPreviewEnabled -bool YES` (use `com.refractored.tinyclips` for the Mac App Store build). Then choose **After recording: Open in Studio** in Settings › Video, or switch on **Record for Studio** in the Record panel.
+  - Known limits: window recordings keep no click or cursor data, and the cursor is part of the screen layer.
 
 ## v1.8.0.0-mac - 2026-09-28
 

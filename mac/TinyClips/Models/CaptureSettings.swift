@@ -409,6 +409,13 @@ class CaptureSettings: ObservableObject {
         get { StudioLook(settingsText: storedStudioDefaultLook) }
         set { storedStudioDefaultLook = newValue?.settingsText() ?? "" }
     }
+    /// Days an exported Studio project is kept after it was last opened. Zero keeps it until deleted.
+    @AppStorage("studioSourceRetentionDays") var studioSourceRetentionDays: Int = 30
+    /// The most disk space Studio projects may use before the oldest are removed. Zero is no limit.
+    @AppStorage("studioStorageCapGigabytes") var studioStorageCapGigabytes: Int = 10
+    var studioCleanupOptions: StudioCleanupOptions {
+        StudioCleanupOptions(retentionDays: studioSourceRetentionDays, sizeCapGigabytes: studioStorageCapGigabytes)
+    }
     @AppStorage("recordAudio") var recordAudio: Bool = false
     @AppStorage("recordMicrophone") var recordMicrophone: Bool = false
     @AppStorage("audioOffsetMs") private var storedAudioOffsetMs: Int = 0
@@ -836,6 +843,7 @@ class CaptureSettings: ObservableObject {
         "videoMouseClickColorHex", "videoMouseClickSize", "videoMouseClickStrokeWidth", "videoMouseClickOpacity", "videoMouseClickDuration",
         "gifMouseClickColorHex", "gifMouseClickSize", "gifMouseClickStrokeWidth", "gifMouseClickOpacity", "gifMouseClickDuration",
         "showTrimmer", "studioPreviewEnabled", "videoAfterRecording", "studioDefaultLook",
+        "studioSourceRetentionDays", "studioStorageCapGigabytes",
         "recordAudio", "recordMicrophone", "audioOffsetMs", "microphoneLimiterEnabled", "windNoiseRemovalEnabled", "selectedMicrophoneID",
         "webcamEnabled", "selectedWebcamID", "webcamShape", "webcamSize", "webcamCorner", "webcamCornerRadius",
         "showScreenshotEditor", screenshotEditorNativeSizeKey, confirmEditorEscapeKey, "showGifTrimmer",
