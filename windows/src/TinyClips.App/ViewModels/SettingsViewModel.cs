@@ -6,10 +6,12 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
+using TinyClips.App.Services.Studio;
 using TinyClips.App.Settings;
 using TinyClips.Core.Capture;
 using TinyClips.Core.Models;
 using TinyClips.Core.Services;
+using TinyClips.Core.Studio;
 
 namespace TinyClips.App;
 
@@ -35,6 +37,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly IClipStorageService _storage;
     private readonly IClipAnalyticsService _analytics;
     private readonly IUploadcareCredentialStore _uploadcareCredentials;
+    private readonly IStudioProjectStore? _studioProjects;
+    private readonly StudioProjectCleanupService? _studioCleanup;
     private readonly DispatcherQueue? _dispatcherQueue;
     private readonly ITeleprompterTranscriptSaveScheduler? _teleprompterTranscriptSaveScheduler;
     private bool _loading;
@@ -74,6 +78,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private Task _launchAtLoginMutation = Task.CompletedTask;
     internal Task LaunchAtLoginInitialization { get; }
     internal Task LaunchAtLoginMutation => _launchAtLoginMutation;
+    private Task? _studioStorageInitialization;
 
     /// <summary>Raised when the selected theme changes so the window can re-apply it live.</summary>
     public event Action? ThemeChanged;
@@ -91,9 +96,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         IWebcamDeviceEnumerator webcamDevices,
         IClipStorageService storage,
         IClipAnalyticsService analytics,
-        IUploadcareCredentialStore uploadcareCredentials)
+        IUploadcareCredentialStore uploadcareCredentials,
+        IStudioProjectStore studioProjects,
+        StudioProjectCleanupService studioCleanup)
         : this(settings, hotKeys, launchAtLogin, audioDevices, webcamDevices, storage, analytics,
-            uploadcareCredentials, DispatcherQueue.GetForCurrentThread())
+            uploadcareCredentials, DispatcherQueue.GetForCurrentThread(), null, studioProjects, studioCleanup)
     {
     }
 
@@ -107,7 +114,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         IClipAnalyticsService analytics,
         IUploadcareCredentialStore uploadcareCredentials,
         DispatcherQueue? dispatcherQueue,
-        ITeleprompterTranscriptSaveScheduler? transcriptSaveScheduler = null)
+        ITeleprompterTranscriptSaveScheduler? transcriptSaveScheduler = null,
+        IStudioProjectStore? studioProjects = null,
+        StudioProjectCleanupService? studioCleanup = null)
     {
         _settings = settings;
         _hotKeys = hotKeys;
@@ -117,6 +126,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         _storage = storage;
         _analytics = analytics;
         _uploadcareCredentials = uploadcareCredentials;
+        _studioProjects = studioProjects;
+        _studioCleanup = studioCleanup;
         _dispatcherQueue = dispatcherQueue;
         _teleprompterTranscriptSaveScheduler = transcriptSaveScheduler ??
             (_dispatcherQueue is null ? null : new DispatcherTranscriptSaveScheduler(_dispatcherQueue));
@@ -581,6 +592,46 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public bool VideoCapturePickerAfterCaptureEnabled => ShowVideoCapturePicker;
 
+    // Studio. Everything bound to these stays hidden unless the preview switch is on.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StudioPreviewVisibility))]
+    [NotifyPropertyChangedFor(nameof(ShowTrimmerToggleVisibility))]
+    private bool _isStudioPreviewEnabled;
+
+    public Microsoft.UI.Xaml.Visibility StudioPreviewVisibility => IsStudioPreviewEnabled
+        ? Microsoft.UI.Xaml.Visibility.Visible
+        : Microsoft.UI.Xaml.Visibility.Collapsed;
+
+    /// <summary>The trimmer toggle shows until the After recording choice takes its place.</summary>
+    public Microsoft.UI.Xaml.Visibility ShowTrimmerToggleVisibility => IsStudioPreviewEnabled
+        ? Microsoft.UI.Xaml.Visibility.Collapsed
+        : Microsoft.UI.Xaml.Visibility.Visible;
+
+    /// <summary>0 = Save, 1 = Open trimmer, 2 = Open in Studio.</summary>
+    [ObservableProperty]
+    private int _videoAfterRecordingIndex = 1;
+
+    [ObservableProperty]
+    private double _studioSourceRetentionDays = CaptureSettings.DefaultStudioSourceRetentionDays;
+
+    [ObservableProperty]
+    private double _studioStorageCapGigabytes = CaptureSettings.DefaultStudioStorageCapGigabytes;
+
+    /// <summary>Project count and total size, such as "3 projects, 1.2 GB".</summary>
+    [ObservableProperty]
+    private string _studioStorageDisplay = "Calculating\u2026";
+
+    /// <summary>What the last Clean up now did. Empty until one has run.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StudioCleanupStatusVisibility))]
+    private string _studioCleanupStatus = string.Empty;
+
+    public Microsoft.UI.Xaml.Visibility StudioCleanupStatusVisibility => string.IsNullOrEmpty(StudioCleanupStatus)
+        ? Microsoft.UI.Xaml.Visibility.Collapsed
+        : Microsoft.UI.Xaml.Visibility.Visible;
+
+    private bool _studioCleanupRunning;
+
     // GIF
     [ObservableProperty]
     private double _gifFrameRate;
@@ -856,6 +907,82 @@ public sealed partial class SettingsViewModel : ObservableObject
         });
     }
 
+    /// <summary>
+    /// Reads the Studio project count and size the first time they are shown. Idempotent, like the
+    /// analytics and media device loads. Does nothing while the Studio preview is switched off.
+    /// </summary>
+    public Task EnsureStudioStorageInitializedAsync() =>
+        _closed || _studioProjects is null
+            ? Task.CompletedTask
+            : _studioStorageInitialization ??= RefreshStudioStorageAsync();
+
+    private async Task RefreshStudioStorageAsync()
+    {
+        if (!IsStudioPreviewEnabled || _studioProjects is null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Sizing every project folder reads the disk, so it stays off the UI thread.
+            var summary = await Task.Run(_studioProjects.GetStorageSummary);
+            if (!_closed)
+            {
+                StudioStorageDisplay = FormatStudioStorage(summary);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Unable to read Studio project storage: {ex}");
+            if (!_closed)
+            {
+                StudioStorageDisplay = "Couldn't read Studio project storage.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs the Studio cleanup rules now, off the UI thread, then refreshes the storage numbers and
+    /// reports the outcome in <see cref="StudioCleanupStatus"/>. A request made while one is already
+    /// running is ignored.
+    /// </summary>
+    public async Task CleanUpStudioProjectsAsync()
+    {
+        if (_studioCleanupRunning || !IsStudioPreviewEnabled || _studioCleanup is null)
+        {
+            return;
+        }
+
+        _studioCleanupRunning = true;
+        StudioCleanupStatus = "Cleaning up\u2026";
+        try
+        {
+            var result = await _studioCleanup.RunAsync();
+            await RefreshStudioStorageAsync();
+            if (!_closed)
+            {
+                StudioCleanupStatus = result switch
+                {
+                    null => "Cleanup couldn't finish. Try again later.",
+                    { DeletedProjectCount: 0 } => "Nothing needed cleaning up.",
+                    { DeletedProjectCount: 1 } => "Removed 1 project.",
+                    _ => $"Removed {result.DeletedProjectCount:N0} projects.",
+                };
+            }
+        }
+        finally
+        {
+            _studioCleanupRunning = false;
+        }
+    }
+
+    private static string FormatStudioStorage(StudioStorageSummary summary)
+    {
+        var projectLabel = summary.ProjectCount == 1 ? "project" : "projects";
+        return $"{summary.ProjectCount:N0} {projectLabel}, {FormatFileSize(summary.TotalBytes)}";
+    }
+
     private void RestoreScalarSettings(SettingsSectionKind? kind = null)
     {
         var wasLoading = _loading;
@@ -882,6 +1009,9 @@ public sealed partial class SettingsViewModel : ObservableObject
                 ConfirmEditorEscape = _settings.ConfirmEditorEscape;
                 LaunchAtLogin = _settings.LaunchAtLogin;
                 ShowBrandingOverlay = _settings.ShowBrandingOverlay;
+                IsStudioPreviewEnabled = _settings.StudioPreviewEnabled;
+                StudioSourceRetentionDays = _settings.StudioSourceRetentionDays;
+                StudioStorageCapGigabytes = _settings.StudioStorageCapGigabytes;
                 MultiMonitorCaptureModeIndex = _settings.MultiMonitorCaptureMode switch
                 {
                     MultiMonitorCaptureMode.UnderCursor => 1,
@@ -966,6 +1096,12 @@ public sealed partial class SettingsViewModel : ObservableObject
                 VideoCountdownEnabled = _settings.VideoCountdownEnabled;
                 VideoCountdownDuration = _settings.VideoCountdownDuration;
                 ShowTrimmer = _settings.ShowTrimmer;
+                VideoAfterRecordingIndex = _settings.VideoAfterRecording switch
+                {
+                    VideoAfterRecording.Save => 0,
+                    VideoAfterRecording.Studio => 2,
+                    _ => 1,
+                };
                 ShowVideoCapturePicker = _settings.ShowVideoCapturePicker;
                 ShowVideoCapturePickerAfterCapture = _settings.ShowVideoCapturePickerAfterCapture;
             }
@@ -1510,6 +1646,45 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnShowTrimmerChanged(bool value) => Persist(SettingsSectionKind.Video, () => _settings.ShowTrimmer = value);
 
+    partial void OnVideoAfterRecordingIndexChanged(int value) => PersistStudio(SettingsSectionKind.Video, () =>
+    {
+        // A ComboBox reports -1 while it has no selection.
+        if (value is < 0 or > 2)
+        {
+            return;
+        }
+
+        _settings.VideoAfterRecording = value switch
+        {
+            0 => VideoAfterRecording.Save,
+            2 => VideoAfterRecording.Studio,
+            _ => VideoAfterRecording.Trimmer,
+        };
+    });
+
+    partial void OnStudioSourceRetentionDaysChanged(double value)
+    {
+        // NumberBox reports NaN when its text is cleared; put the saved value back.
+        if (double.IsNaN(value))
+        {
+            StudioSourceRetentionDays = _settings.StudioSourceRetentionDays;
+            return;
+        }
+
+        PersistStudio(SettingsSectionKind.General, () => _settings.StudioSourceRetentionDays = (int)Math.Round(value));
+    }
+
+    partial void OnStudioStorageCapGigabytesChanged(double value)
+    {
+        if (double.IsNaN(value))
+        {
+            StudioStorageCapGigabytes = _settings.StudioStorageCapGigabytes;
+            return;
+        }
+
+        PersistStudio(SettingsSectionKind.General, () => _settings.StudioStorageCapGigabytes = (int)Math.Round(value));
+    }
+
     partial void OnShowVideoCapturePickerChanged(bool value) =>
         Persist(SettingsSectionKind.Video, () =>
         {
@@ -1685,6 +1860,16 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
 
         apply();
+    }
+
+    // The Studio controls are hidden while the preview is switched off, so nothing they are bound
+    // to may reach the saved settings then.
+    private void PersistStudio(SettingsSectionKind kind, Action apply)
+    {
+        if (IsStudioPreviewEnabled)
+        {
+            Persist(kind, apply);
+        }
     }
 
     /// <summary>
