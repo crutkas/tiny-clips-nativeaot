@@ -1634,6 +1634,7 @@ class CaptureManager: ObservableObject {
                         cameraURL: savedWebcamURL,
                         screenFirstSampleTime: videoRecorderAtStop?.firstScreenSampleTime,
                         cameraFirstSampleTime: webcamRecorderAtStop?.firstSampleTime,
+                        recordedAudioTracks: videoRecorderAtStop?.audioTrackKinds ?? [],
                         mouseClicks: capturedMouseClickData?.events ?? [],
                         cameraCornerChanges: webcamPositionEvents,
                         clickOverlayStyle: videoOverlayStyle,
