@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
 using TinyClips.App.Services.Studio;
 using TinyClips.App.Settings;
+using TinyClips.App.ViewModels.Studio;
 using TinyClips.Core.Capture;
 using TinyClips.Core.Models;
 using TinyClips.Core.Services;
@@ -39,6 +40,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly IUploadcareCredentialStore _uploadcareCredentials;
     private readonly IStudioProjectStore? _studioProjects;
     private readonly StudioProjectCleanupService? _studioCleanup;
+    private readonly StudioProjectTracker? _studioTracker;
     private readonly DispatcherQueue? _dispatcherQueue;
     private readonly ITeleprompterTranscriptSaveScheduler? _teleprompterTranscriptSaveScheduler;
     private bool _loading;
@@ -98,9 +100,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         IClipAnalyticsService analytics,
         IUploadcareCredentialStore uploadcareCredentials,
         IStudioProjectStore studioProjects,
-        StudioProjectCleanupService studioCleanup)
+        StudioProjectCleanupService studioCleanup,
+        StudioProjectTracker studioTracker)
         : this(settings, hotKeys, launchAtLogin, audioDevices, webcamDevices, storage, analytics,
-            uploadcareCredentials, DispatcherQueue.GetForCurrentThread(), null, studioProjects, studioCleanup)
+            uploadcareCredentials, DispatcherQueue.GetForCurrentThread(), null, studioProjects, studioCleanup, studioTracker)
     {
     }
 
@@ -116,7 +119,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         DispatcherQueue? dispatcherQueue,
         ITeleprompterTranscriptSaveScheduler? transcriptSaveScheduler = null,
         IStudioProjectStore? studioProjects = null,
-        StudioProjectCleanupService? studioCleanup = null)
+        StudioProjectCleanupService? studioCleanup = null,
+        StudioProjectTracker? studioTracker = null)
     {
         _settings = settings;
         _hotKeys = hotKeys;
@@ -128,6 +132,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         _uploadcareCredentials = uploadcareCredentials;
         _studioProjects = studioProjects;
         _studioCleanup = studioCleanup;
+        _studioTracker = studioTracker;
+        if (_studioTracker is not null)
+        {
+            _studioTracker.Changed += OnStudioOpenProjectsChanged;
+        }
+        if (_studioCleanup is not null)
+        {
+            _studioCleanup.CleanupCompleted += OnStudioCleanupCompleted;
+        }
         _dispatcherQueue = dispatcherQueue;
         _teleprompterTranscriptSaveScheduler = transcriptSaveScheduler ??
             (_dispatcherQueue is null ? null : new DispatcherTranscriptSaveScheduler(_dispatcherQueue));
@@ -233,6 +246,14 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        if (_studioTracker is not null)
+        {
+            _studioTracker.Changed -= OnStudioOpenProjectsChanged;
+        }
+        if (_studioCleanup is not null)
+        {
+            _studioCleanup.CleanupCompleted -= OnStudioCleanupCompleted;
+        }
         _closed = true;
         _teleprompterTranscriptSaveScheduler?.Stop();
         PersistPendingTeleprompterTranscript();
@@ -596,6 +617,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StudioPreviewVisibility))]
     [NotifyPropertyChangedFor(nameof(ShowTrimmerToggleVisibility))]
+    [NotifyPropertyChangedFor(nameof(StudioDraftsVisibility))]
     private bool _isStudioPreviewEnabled;
 
     public Microsoft.UI.Xaml.Visibility StudioPreviewVisibility => IsStudioPreviewEnabled
@@ -631,6 +653,17 @@ public sealed partial class SettingsViewModel : ObservableObject
         : Microsoft.UI.Xaml.Visibility.Visible;
 
     private bool _studioCleanupRunning;
+    private int _studioRefreshGeneration;
+
+    /// <summary>
+    /// The Studio projects that were never exported, newest first. A draft has no exported video,
+    /// so it is not in the Clips Library: this list is the way back to it.
+    /// </summary>
+    public System.Collections.ObjectModel.ObservableCollection<StudioDraftItem> StudioDrafts { get; } = new();
+
+    public Microsoft.UI.Xaml.Visibility StudioDraftsVisibility => IsStudioPreviewEnabled && StudioDrafts.Count > 0
+        ? Microsoft.UI.Xaml.Visibility.Visible
+        : Microsoft.UI.Xaml.Visibility.Collapsed;
 
     // GIF
     [ObservableProperty]
@@ -923,23 +956,115 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        // Several things ask for a refresh at once: a window closing, then the cleanup it starts.
+        // Only the answer to the newest request is shown.
+        var generation = ++_studioRefreshGeneration;
         try
         {
             // Sizing every project folder reads the disk, so it stays off the UI thread.
-            var summary = await Task.Run(_studioProjects.GetStorageSummary);
-            if (!_closed)
+            var summaries = await Task.Run(_studioProjects.ListSummaries);
+            if (!_closed && generation == _studioRefreshGeneration)
             {
-                StudioStorageDisplay = FormatStudioStorage(summary);
+                StudioStorageDisplay = FormatStudioStorage(
+                    new StudioStorageSummary(summaries.Count, summaries.Sum(summary => summary.SizeBytes)));
+                ShowStudioDrafts(summaries);
             }
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Unable to read Studio project storage: {ex}");
-            if (!_closed)
+            if (!_closed && generation == _studioRefreshGeneration)
             {
                 StudioStorageDisplay = "Couldn't read Studio project storage.";
             }
         }
+    }
+
+    /// <summary>
+    /// Shows the projects that were never exported, newest first. Rows that are still there keep
+    /// their place, and only whether they are open is brought up to date, so a button in the list
+    /// does not lose keyboard focus because another row changed.
+    /// </summary>
+    private void ShowStudioDrafts(IReadOnlyList<StudioProjectSummary> summaries)
+    {
+        var drafts = summaries
+            .Where(summary => summary.IsDraft && !summary.IsFlat)
+            .OrderByDescending(summary => summary.CreatedAt)
+            .Select(summary => new StudioDraftItem(
+                summary.Id,
+                summary.Name,
+                $"{summary.CreatedAt.ToLocalTime():g}, {FormatFileSize(summary.SizeBytes)}",
+                _studioTracker?.IsOpen(summary.Id) == true))
+            .ToList();
+
+        var isSameList = drafts.Count == StudioDrafts.Count
+            && drafts.Zip(StudioDrafts).All(pair => pair.First.IsSameDraft(pair.Second));
+        if (isSameList)
+        {
+            for (var index = 0; index < drafts.Count; index++)
+            {
+                StudioDrafts[index].Details = drafts[index].Details;
+                StudioDrafts[index].IsOpen = drafts[index].IsOpen;
+            }
+        }
+        else
+        {
+            StudioDrafts.Clear();
+            foreach (var draft in drafts)
+            {
+                StudioDrafts.Add(draft);
+            }
+        }
+
+        OnPropertyChanged(nameof(StudioDraftsVisibility));
+    }
+
+    // Raised on the UI thread, by a Studio window opening or having finished closing.
+    private void OnStudioOpenProjectsChanged(object? sender, EventArgs e) => RefreshStudioProjectsIfShown();
+
+    // Raised on a background thread. Clean up now refreshes by itself when it is done.
+    private void OnStudioCleanupCompleted(object? sender, StudioCleanupResult e) =>
+        _dispatcherQueue?.TryEnqueue(() =>
+        {
+            if (!_studioCleanupRunning)
+            {
+                RefreshStudioProjectsIfShown();
+            }
+        });
+
+    private void RefreshStudioProjectsIfShown()
+    {
+        // Nothing to refresh until General has shown the numbers for the first time.
+        if (!_closed && _studioStorageInitialization is not null)
+        {
+            _ = RefreshStudioStorageAsync();
+        }
+    }
+
+    /// <summary>
+    /// Deletes a draft and its recordings, off the UI thread, then refreshes the list and the
+    /// storage numbers. A draft that is open in an editor is left alone.
+    /// </summary>
+    /// <returns>Null when the draft is gone or was left alone, otherwise a sentence saying why not.</returns>
+    public async Task<string?> DeleteStudioDraftAsync(StudioDraftItem draft)
+    {
+        if (!IsStudioPreviewEnabled || _studioProjects is null || _studioTracker?.IsOpen(draft.Id) == true)
+        {
+            return null;
+        }
+
+        string? error = null;
+        try
+        {
+            await Task.Run(() => _studioProjects.Delete(draft.Id));
+        }
+        catch (Exception ex)
+        {
+            error = $"The draft could not be deleted: {ex.Message}";
+        }
+
+        await RefreshStudioStorageAsync();
+        return error;
     }
 
     /// <summary>
