@@ -1379,6 +1379,23 @@ public sealed class VideoRecordingService : IVideoRecordingService
         }
     }
 
+    /// <summary>
+    /// Stops the camera of a Studio recording and finalizes its track. Called once the screen
+    /// track has taken its last frame: the camera's frames come until the device has stopped, so
+    /// its track ends after the screen's. Does nothing for an ordinary recording. Never throws.
+    /// </summary>
+    private async Task StopStudioCameraAsync(StudioCameraRecorder? cameraRecorder)
+    {
+        if (cameraRecorder is null)
+        {
+            return;
+        }
+
+        await StopWebcamOverlayAsync().ConfigureAwait(false);
+        _webcamCapture.FrameArrived -= cameraRecorder.OnFrameArrived;
+        await Task.Run(cameraRecorder.Finish).ConfigureAwait(false);
+    }
+
     private void OnWebcamCaptureFailed(object? sender, WebcamCaptureFailedEventArgs args)
     {
         WebcamDiagnostics.Log($"OnWebcamCaptureFailed (mid-recording): code={args.Code} message='{args.Message}' — overlay disabled for the rest of this recording.");
@@ -2002,11 +2019,15 @@ public sealed class VideoRecordingService : IVideoRecordingService
             {
                 WebcamDiagnostics.Log($"Recording stopping — webcam composite summary: composited={Interlocked.Read(ref _webcamCompositedFrames)} noFrameYet={Interlocked.Read(ref _webcamNoFrameFrames)} overlayDisabled={Interlocked.Read(ref _webcamOverlayNullFrames)}");
             }
-            await StopWebcamOverlayAsync().ConfigureAwait(false);
-            if (_studioCameraRecorder is { } cameraRecorder)
+
+            // A Studio recording's camera goes on until its screen track is finished. Outside the
+            // camera track's own time the camera is not drawn, so a camera that stopped first, as
+            // it does in an ordinary recording, would be missing from the last moments of every
+            // Studio recording, for as long as the camera and its file took to stop.
+            var studioCamera = _studioCameraRecorder;
+            if (studioCamera is null)
             {
-                _webcamCapture.FrameArrived -= cameraRecorder.OnFrameArrived;
-                await Task.Run(cameraRecorder.Finish).ConfigureAwait(false);
+                await StopWebcamOverlayAsync().ConfigureAwait(false);
             }
 
             // Stop the audio devices first, then let the muxer drain the audio already captured
@@ -2069,6 +2090,11 @@ public sealed class VideoRecordingService : IVideoRecordingService
             {
                 DisposeRecordingPipeline();
                 throw;
+            }
+            finally
+            {
+                // Also when the screen track cannot be finalized: the camera must not stay on.
+                await StopStudioCameraAsync(studioCamera).ConfigureAwait(false);
             }
 
             DisposeRecordingPipeline();
@@ -2324,6 +2350,21 @@ public sealed class VideoRecordingService : IVideoRecordingService
         var recorder = _studioCameraRecorder;
         if (recorder is null || !recorder.HasFrames || paths.CameraPath is null || !HasNonEmptyOutputFile(paths.CameraPath))
         {
+            if (recorder is not null)
+            {
+                // The camera was on, in its bubble, and nothing of it is in the project. Say so.
+                WebcamDiagnostics.Log($"Studio camera: no camera track ({recorder.FramesWritten} frames written); the project has the screen only.");
+                try
+                {
+                    WebcamCaptureFailed?.Invoke(this, "The camera could not be recorded. The Studio project has the screen only.");
+                }
+                catch
+                {
+                    // This runs while the project is being saved: a listener's failure must not
+                    // be taken for a failure to save it.
+                }
+            }
+
             DeleteOutputFileIfPresent(paths.CameraPath);
             return null;
         }
