@@ -916,7 +916,9 @@ class CaptureManager: ObservableObject {
                     return
                 }
 
-                let shouldSaveImmediately = !settings.showTrimmer || settings.saveImmediatelyVideo
+                // Asked of the choice and not of the trimmer switch: with Studio chosen the
+                // switch keeps what it said before, and no trimmer opens.
+                let shouldSaveImmediately = settings.videoAfterRecording != .trimmer || settings.saveImmediatelyVideo
                 let url: URL
                 if let studioCoordinator {
                     url = studioCoordinator.screenURL
@@ -1452,7 +1454,7 @@ class CaptureManager: ObservableObject {
         // Snapshot video settings before any suspension so that overlay output URL
         // selection and downstream trimmer/save decisions stay consistent even if
         // the user changes preferences while export is in progress.
-        let videoShowTrimmer = streamFailureMessage == nil && CaptureSettings.shared.showTrimmer
+        let videoShowTrimmer = streamFailureMessage == nil && CaptureSettings.shared.videoAfterRecording == .trimmer
         let videoShouldSaveImmediately = streamFailureMessage != nil || !videoShowTrimmer || CaptureSettings.shared.saveImmediatelyVideo
         let shouldReturnToPickerAfterRecording = streamFailureMessage == nil && self.shouldReturnToPickerAfterRecording
         let videoOverlayStyle = CaptureSettings.shared.mouseClickOverlayStyle(for: .video)
