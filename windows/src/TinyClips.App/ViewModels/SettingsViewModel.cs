@@ -1908,11 +1908,15 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnIsStudioPreviewEnabledChanged(bool value)
     {
-        Persist(SettingsSectionKind.General, () => _settings.StudioPreviewEnabled = value);
-        if (!_loading)
+        if (!IsPersistenceSuppressed(SettingsSectionKind.General))
         {
-            // The trimmer switch and the After recording choice stand in for each other, and
-            // the one that was hidden has not followed what the other was set to.
+            _settings.StudioPreviewEnabled = value;
+
+            // The trimmer switch and the After recording choice stand in for each other: one is
+            // shown while Studio is off, the other while it is on. Switching Studio off has
+            // just brought the saved switch in step with the choice that was left (the settings
+            // do that), and each of the two now shows what is saved.
+            var wasLoading = _loading;
             _loading = true;
             try
             {
@@ -1926,7 +1930,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             }
             finally
             {
-                _loading = false;
+                _loading = wasLoading;
             }
         }
 
