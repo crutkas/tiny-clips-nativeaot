@@ -116,6 +116,24 @@ public sealed partial class SettingsViewModel : ObservableObject
         IClipStorageService storage,
         IClipAnalyticsService analytics,
         IUploadcareCredentialStore uploadcareCredentials,
+        IStudioProjectStore studioProjects,
+        StudioProjectCleanupService studioCleanup,
+        StudioProjectTracker studioTracker,
+        DispatcherQueue? dispatcherQueue)
+        : this(settings, hotKeys, launchAtLogin, audioDevices, webcamDevices, storage, analytics,
+            uploadcareCredentials, dispatcherQueue, null, studioProjects, studioCleanup, studioTracker)
+    {
+    }
+
+    internal SettingsViewModel(
+        ICaptureSettings settings,
+        IHotKeyService hotKeys,
+        ILaunchAtLoginService launchAtLogin,
+        IAudioDeviceService audioDevices,
+        IWebcamDeviceEnumerator webcamDevices,
+        IClipStorageService storage,
+        IClipAnalyticsService analytics,
+        IUploadcareCredentialStore uploadcareCredentials,
         DispatcherQueue? dispatcherQueue,
         ITeleprompterTranscriptSaveScheduler? transcriptSaveScheduler = null,
         IStudioProjectStore? studioProjects = null,
