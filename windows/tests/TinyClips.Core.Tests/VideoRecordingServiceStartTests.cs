@@ -58,7 +58,6 @@ public sealed class VideoRecordingServiceStartTests : IDisposable
     public async Task APreparationThatFailsBeforeItHasAFile_LeavesTheLastRecordingWhereItIs()
     {
         await CancelAsItBegins(token => _recorder.PrepareAsync(null, null, token));
-
         Assert.False(_recorder.IsRecording);
         Assert.True(File.Exists(_lastRecording), "The start that failed deleted the recording made before it.");
         Assert.Equal([1, 2, 3], File.ReadAllBytes(_lastRecording));
@@ -68,7 +67,6 @@ public sealed class VideoRecordingServiceStartTests : IDisposable
     public async Task AStartThatFailsBeforeItHasAFile_LeavesTheLastRecordingWhereItIs()
     {
         await CancelAsItBegins(token => _recorder.StartAsync(null, null, null, token));
-
         Assert.False(_recorder.IsRecording);
         Assert.True(File.Exists(_lastRecording), "The start that failed deleted the recording made before it.");
     }
