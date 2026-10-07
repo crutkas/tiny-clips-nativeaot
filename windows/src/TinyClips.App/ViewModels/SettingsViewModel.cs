@@ -635,7 +635,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     // switch is on.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StudioPreviewVisibility))]
-    [NotifyPropertyChangedFor(nameof(ShowTrimmerToggleVisibility))]
     [NotifyPropertyChangedFor(nameof(StudioDraftsVisibility))]
     [NotifyPropertyChangedFor(nameof(StudioKeptNoteVisibility))]
     private bool _isStudioPreviewEnabled;
@@ -655,15 +654,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     public Microsoft.UI.Xaml.Visibility StudioKeptNoteVisibility => !IsStudioPreviewEnabled && StudioKeptNote.Length > 0
         ? Microsoft.UI.Xaml.Visibility.Visible
         : Microsoft.UI.Xaml.Visibility.Collapsed;
-
-    /// <summary>The trimmer toggle shows until the After recording choice takes its place.</summary>
-    public Microsoft.UI.Xaml.Visibility ShowTrimmerToggleVisibility => IsStudioPreviewEnabled
-        ? Microsoft.UI.Xaml.Visibility.Collapsed
-        : Microsoft.UI.Xaml.Visibility.Visible;
-
-    /// <summary>0 = Save, 1 = Open trimmer, 2 = Open in Studio.</summary>
-    [ObservableProperty]
-    private int _videoAfterRecordingIndex = 1;
 
     [ObservableProperty]
     private double _studioSourceRetentionDays = CaptureSettings.DefaultStudioSourceRetentionDays;
@@ -1356,12 +1346,6 @@ public sealed partial class SettingsViewModel : ObservableObject
                 VideoCountdownEnabled = _settings.VideoCountdownEnabled;
                 VideoCountdownDuration = _settings.VideoCountdownDuration;
                 ShowTrimmer = _settings.ShowTrimmer;
-                VideoAfterRecordingIndex = _settings.VideoAfterRecording switch
-                {
-                    VideoAfterRecording.Save => 0,
-                    VideoAfterRecording.Studio => 2,
-                    _ => 1,
-                };
                 ShowVideoCapturePicker = _settings.ShowVideoCapturePicker;
                 ShowVideoCapturePickerAfterCapture = _settings.ShowVideoCapturePickerAfterCapture;
             }
@@ -1911,48 +1895,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (!IsPersistenceSuppressed(SettingsSectionKind.General))
         {
             _settings.StudioPreviewEnabled = value;
-
-            // The trimmer switch and the After recording choice stand in for each other: one is
-            // shown while Studio is off, the other while it is on. Switching Studio off has
-            // just brought the saved switch in step with the choice that was left (the settings
-            // do that), and each of the two now shows what is saved.
-            var wasLoading = _loading;
-            _loading = true;
-            try
-            {
-                ShowTrimmer = _settings.ShowTrimmer;
-                VideoAfterRecordingIndex = _settings.VideoAfterRecording switch
-                {
-                    VideoAfterRecording.Save => 0,
-                    VideoAfterRecording.Studio => 2,
-                    _ => 1,
-                };
-            }
-            finally
-            {
-                _loading = wasLoading;
-            }
         }
 
         // The numbers, the drafts, and the line that says what is kept while Studio is off.
         RefreshStudioProjectsIfShown();
     }
-
-    partial void OnVideoAfterRecordingIndexChanged(int value) => PersistStudio(SettingsSectionKind.Video, () =>
-    {
-        // A ComboBox reports -1 while it has no selection.
-        if (value is < 0 or > 2)
-        {
-            return;
-        }
-
-        _settings.VideoAfterRecording = value switch
-        {
-            0 => VideoAfterRecording.Save,
-            2 => VideoAfterRecording.Studio,
-            _ => VideoAfterRecording.Trimmer,
-        };
-    });
 
     partial void OnStudioSourceRetentionDaysChanged(double value)
     {
