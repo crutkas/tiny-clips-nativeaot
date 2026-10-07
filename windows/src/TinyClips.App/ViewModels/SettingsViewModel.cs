@@ -1100,7 +1100,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private void RefreshStudioProjectsIfShown()
     {
-        // Nothing to refresh until General has shown the numbers for the first time.
+        // Nothing to refresh until the Studio page has shown the numbers for the first time.
         if (!_closed && _studioStorageInitialization is not null)
         {
             _ = RefreshStudioStorageAsync();
@@ -1259,15 +1259,19 @@ public sealed partial class SettingsViewModel : ObservableObject
                 ConfirmEditorEscape = _settings.ConfirmEditorEscape;
                 LaunchAtLogin = _settings.LaunchAtLogin;
                 ShowBrandingOverlay = _settings.ShowBrandingOverlay;
-                IsStudioPreviewEnabled = _settings.StudioPreviewEnabled;
-                StudioSourceRetentionDays = _settings.StudioSourceRetentionDays;
-                StudioStorageCapGigabytes = _settings.StudioStorageCapGigabytes;
                 MultiMonitorCaptureModeIndex = _settings.MultiMonitorCaptureMode switch
                 {
                     MultiMonitorCaptureMode.UnderCursor => 1,
                     MultiMonitorCaptureMode.MainDisplay => 2,
                     _ => 0,
                 };
+            }
+
+            if (kind is null or SettingsSectionKind.Studio)
+            {
+                IsStudioPreviewEnabled = _settings.StudioPreviewEnabled;
+                StudioSourceRetentionDays = _settings.StudioSourceRetentionDays;
+                StudioStorageCapGigabytes = _settings.StudioStorageCapGigabytes;
             }
 
             if (kind is null or SettingsSectionKind.Uploadcare)
@@ -1892,7 +1896,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnIsStudioPreviewEnabledChanged(bool value)
     {
-        if (!IsPersistenceSuppressed(SettingsSectionKind.General))
+        if (!IsPersistenceSuppressed(SettingsSectionKind.Studio))
         {
             _settings.StudioPreviewEnabled = value;
         }
@@ -1910,7 +1914,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        PersistStudio(SettingsSectionKind.General, () => _settings.StudioSourceRetentionDays = (int)Math.Round(value));
+        PersistStudio(() => _settings.StudioSourceRetentionDays = (int)Math.Round(value));
     }
 
     partial void OnStudioStorageCapGigabytesChanged(double value)
@@ -1921,7 +1925,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        PersistStudio(SettingsSectionKind.General, () => _settings.StudioStorageCapGigabytes = (int)Math.Round(value));
+        PersistStudio(() => _settings.StudioStorageCapGigabytes = (int)Math.Round(value));
     }
 
     partial void OnShowVideoCapturePickerChanged(bool value) =>
@@ -2103,11 +2107,11 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     // The Studio controls are hidden while the preview is switched off, so nothing they are bound
     // to may reach the saved settings then.
-    private void PersistStudio(SettingsSectionKind kind, Action apply)
+    private void PersistStudio(Action apply)
     {
         if (IsStudioPreviewEnabled)
         {
-            Persist(kind, apply);
+            Persist(SettingsSectionKind.Studio, apply);
         }
     }
 
