@@ -22,6 +22,23 @@
     <Compile Include="..\..\src\TinyClips.App\Infrastructure\BuildFlavor.cs" Link="BuildFlavor.cs" />
     <Compile Include="..\..\src\TinyClips.App\Services\GlobalHotKeyFailureFormatter.cs" Link="GlobalHotKeyFailureFormatter.cs" />
     <Compile Include="..\..\src\TinyClips.App\Services\GlobalHotKeyManager.cs" Link="GlobalHotKeyManager.cs" />
+    <!--
+      The Studio editor's view model. The one app class it needs that cannot be compiled here,
+      the background swatches, which are the screenshot editor's presets, has a stand-in next to
+      the tests. The markup the view model is bound to goes in as text: the tests read from it
+      which values a control is bound to both ways.
+    -->
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioViewModel.cs" Link="Studio\StudioViewModel.cs" />
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioViewModel.Cut.cs" Link="Studio\StudioViewModel.Cut.cs" />
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioViewModel.Inspector.cs" Link="Studio\StudioViewModel.Inspector.cs" />
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioViewModel.Scene.cs" Link="Studio\StudioViewModel.Scene.cs" />
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioViewModel.Speed.cs" Link="Studio\StudioViewModel.Speed.cs" />
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioViewModel.Zoom.cs" Link="Studio\StudioViewModel.Zoom.cs" />
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioAnnouncementEventArgs.cs" Link="Studio\StudioAnnouncementEventArgs.cs" />
+    <EmbeddedResource Include="..\..\src\TinyClips.App\Controls\Studio\StudioInspector.xaml" Link="Studio\StudioInspector.xaml" LogicalName="StudioInspector.xaml" />
+    <EmbeddedResource Include="..\..\src\TinyClips.App\Views\Studio\StudioWindow.xaml" Link="Studio\StudioWindow.xaml" LogicalName="StudioWindow.xaml" />
+    <!-- A clock a test advances by hand, shared with the Core tests. -->
+    <Compile Include="..\TinyClips.Core.Tests\ManualTimeProvider.cs" Link="Support\ManualTimeProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>
