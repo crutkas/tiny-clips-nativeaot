@@ -22,6 +22,8 @@
     <Compile Include="..\..\src\TinyClips.App\Infrastructure\BuildFlavor.cs" Link="BuildFlavor.cs" />
     <Compile Include="..\..\src\TinyClips.App\Services\GlobalHotKeyFailureFormatter.cs" Link="GlobalHotKeyFailureFormatter.cs" />
     <Compile Include="..\..\src\TinyClips.App\Services\GlobalHotKeyManager.cs" Link="GlobalHotKeyManager.cs" />
+    <!-- How wide the tray popup is for three capture tiles and for four. -->
+    <Compile Include="..\..\src\TinyClips.App\Infrastructure\TrayPopupLayout.cs" Link="TrayPopupLayout.cs" />
     <!--
       The Studio editor's view model. The one app class it needs that cannot be compiled here,
       the background swatches, which are the screenshot editor's presets, has a stand-in next to
