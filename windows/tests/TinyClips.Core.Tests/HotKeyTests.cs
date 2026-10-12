@@ -13,9 +13,26 @@ public sealed class HotKeyTests
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x35), service.DefaultFor(HotKeyAction.Screenshot));
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x36), service.DefaultFor(HotKeyAction.RecordVideo));
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x37), service.DefaultFor(HotKeyAction.RecordGif));
-        Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x54), service.DefaultFor(HotKeyAction.RecognizeText));
+        Assert.Equal(new HotKeyDefinition(HotKeyModifiers.None, 0), service.DefaultFor(HotKeyAction.RecognizeText));
+        Assert.Equal(new HotKeyDefinition(HotKeyModifiers.None, 0), service.DefaultFor(HotKeyAction.ScreenshotRegion));
+        Assert.Equal(new HotKeyDefinition(HotKeyModifiers.None, 0), service.DefaultFor(HotKeyAction.ScreenshotWindow));
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.None, 0), service.DefaultFor(HotKeyAction.ScreenshotScreen));
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x53), service.DefaultFor(HotKeyAction.StopRecording));
+    }
+
+    [Fact]
+    public void DefaultFor_BindsOnlyScreenshotVideoAndGif()
+    {
+        var service = CreateService();
+
+        var bound = Enum.GetValues<HotKeyAction>()
+            .Where(action => action != HotKeyAction.StopRecording)
+            .Where(action => !service.DefaultFor(action).IsUnbound)
+            .ToArray();
+
+        Assert.Equal(
+            new[] { HotKeyAction.Screenshot, HotKeyAction.RecordVideo, HotKeyAction.RecordGif },
+            bound);
     }
 
     [Theory]
@@ -39,7 +56,7 @@ public sealed class HotKeyTests
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x35), service.GetBinding(HotKeyAction.Screenshot));
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x36), service.GetBinding(HotKeyAction.RecordVideo));
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x37), service.GetBinding(HotKeyAction.RecordGif));
-        Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x54), service.GetBinding(HotKeyAction.RecognizeText));
+        Assert.True(service.GetBinding(HotKeyAction.RecognizeText).IsUnbound);
         Assert.Equal(new HotKeyDefinition(HotKeyModifiers.Control | HotKeyModifiers.Shift, 0x53), service.GetBinding(HotKeyAction.StopRecording));
     }
 
