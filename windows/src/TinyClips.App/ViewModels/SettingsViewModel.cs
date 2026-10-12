@@ -971,10 +971,23 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// the line under the switch that says what is still kept; where Studio was never used there
     /// is no folder to read, and none is made.
     /// </summary>
-    public Task EnsureStudioStorageInitializedAsync() =>
-        _closed || _studioProjects is null
-            ? Task.CompletedTask
-            : _studioStorageInitialization ??= RefreshStudioStorageAsync();
+    public Task EnsureStudioStorageInitializedAsync()
+    {
+        if (_closed)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_studioProjects is null)
+        {
+            StudioStorageDisplay = "Couldn't read Studio project storage.";
+            StudioKeptNote = string.Empty;
+            StudioDrafts.Clear();
+            return Task.CompletedTask;
+        }
+
+        return _studioStorageInitialization ??= RefreshStudioStorageAsync();
+    }
 
     private async Task RefreshStudioStorageAsync()
     {
@@ -1146,7 +1159,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     public async Task<(string? Path, string? Error)> SaveStudioScreenRecordingAsync(StudioDraftItem draft)
     {
         var id = draft.Id;
-        if (!IsStudioPreviewEnabled || !_studioRecordingsBeingSaved.Add(id))
+        var projects = _studioProjects;
+        if (!IsStudioPreviewEnabled || projects is null || !_studioRecordingsBeingSaved.Add(id))
         {
             return (null, null);
         }
@@ -1155,7 +1169,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             var path = await StudioScreenRecording.SaveAsync(
-                _studioProjects,
+                projects,
                 id,
                 () => _storage.GenerateFilePath(CaptureType.Video));
             return (path, null);
