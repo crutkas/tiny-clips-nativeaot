@@ -5,6 +5,8 @@ own `CHANGELOG.md` at the repository root.
 
 ## [Unreleased]
 
+## [v1.8.3-windows] - 2026-10-12
+
 ### Added
 - **Text box styles** — Screenshot text annotations can use Plain, Light, Dark, or Accent
   presets and custom background, border, padding, and corner settings. The choice applies to the
