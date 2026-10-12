@@ -5,6 +5,10 @@ own `CHANGELOG.md` at the repository root.
 
 ## [Unreleased]
 
+### Changed
+- **Capture picker parity** — Text recognition remains available from the tray and its global
+  shortcut, but no longer appears as a duplicate option in the screenshot picker. (#452)
+
 ## [v1.8.3-windows] - 2026-10-12
 
 ### Added
