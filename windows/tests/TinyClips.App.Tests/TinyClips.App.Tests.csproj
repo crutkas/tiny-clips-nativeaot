@@ -11,6 +11,8 @@
     <ProjectReference Include="..\..\src\TinyClips.Core\TinyClips.Core.csproj" />
     <!-- Compile the shipping view model without launching a packaged XAML application. -->
     <Compile Include="..\..\src\TinyClips.App\ViewModels\SettingsViewModel.cs" Link="SettingsViewModel.cs" />
+    <Compile Include="..\..\src\TinyClips.App\ViewModels\WhatsNewViewModel.cs" Link="WhatsNewViewModel.cs" />
+    <EmbeddedResource Include="..\..\src\TinyClips.App\Views\WhatsNewWindow.xaml" Link="Settings\Markup\WhatsNewWindow.xaml" LogicalName="SettingsMarkup.WhatsNewWindow.xaml" />
     <!-- Tiny Clips Studio classes used by the shipping view model. -->
     <Compile Include="..\..\src\TinyClips.App\ViewModels\Studio\StudioDraftItem.cs" Link="Studio\StudioDraftItem.cs" />
     <Compile Include="..\..\src\TinyClips.App\Services\Studio\StudioProjectCleanupService.cs" Link="Studio\StudioProjectCleanupService.cs" />

@@ -3722,6 +3722,15 @@ public partial class App : Application
 
     private void OpenSettingsWindow() => OpenSettingsWindow(section: null);
 
+    internal void RefreshStudioPreviewSetting()
+    {
+        if (_settingsWindow is not null)
+        {
+            _settingsWindow.ViewModel.IsStudioPreviewEnabled =
+                Services.GetRequiredService<ICaptureSettings>().StudioPreviewEnabled;
+        }
+    }
+
     internal void OpenSettingsWindow(SettingsSectionKind? section)
     {
         if (_settingsWindow is null)

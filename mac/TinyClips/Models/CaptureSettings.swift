@@ -305,6 +305,19 @@ extension NSColor {
 
 class CaptureSettings: ObservableObject {
     static let shared = CaptureSettings()
+    // Bump when release highlights change, independently of the app version.
+    static let whatsNewContentRevision = 1
+    static let lastSeenWhatsNewRevisionKey = "lastSeenWhatsNewRevision"
+
+    static func shouldShowWhatsNew(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: "hasCompletedOnboarding")
+            && defaults.integer(forKey: lastSeenWhatsNewRevisionKey) < whatsNewContentRevision
+    }
+
+    static func markWhatsNewSeen(in defaults: UserDefaults = .standard) {
+        defaults.set(whatsNewContentRevision, forKey: lastSeenWhatsNewRevisionKey)
+    }
+
     static let videoCodecKey = CaptureSettingsDefaultsKey.videoCodec
     static let confirmEditorEscapeKey = CaptureSettingsDefaultsKey.confirmEditorEscape
     static let screenshotEditorNativeSizeKey = "screenshotEditorNativeSize"

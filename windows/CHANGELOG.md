@@ -6,6 +6,7 @@ own `CHANGELOG.md` at the repository root.
 ## [Unreleased]
 
 ### Added
+- **What's New introduces Studio.** A new illustrated screen-and-camera composition and editing highlights explain the early preview, with a switch to enable it right there. It appears once per content revision for existing users, not on every app update; new installs keep the onboarding tour. The switch is saved, and ordinary video recording stays unchanged.
 - **Tiny Clips Studio (early preview, off by default).** Studio records the screen and the camera
   as separate layers and opens an editor when the recording ends. Pick a background and padding,
   round the screen card, choose a camera shape and one of four layouts (screen only, camera

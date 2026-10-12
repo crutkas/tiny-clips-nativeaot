@@ -200,7 +200,10 @@ Historical benchmark values are not verified encoder/output-frame measurements.
 ## Tiny Clips Studio (preview)
 
 Studio has a page of its own in Settings, **Studio**, after Video. Studio is off until you
-switch it on there: **Settings › Studio › Tiny Clips Studio (Preview)**. With the switch off
+switch it on in **Settings › Studio › Tiny Clips Studio (Preview)** or in the illustrated
+**What's New** introduction. Existing users see that introduction once per content revision;
+new installs get the onboarding tour instead. To replace the highlights in a future release,
+bump `WhatsNewViewModel.ContentRevision`, not the package version. With the switch off
 the page shows nothing else, nothing else of Studio is shown anywhere, and a recording is made
 as it always was.
 Switching it off again deletes nothing: the projects stay where they are, are not cleaned up while

@@ -209,6 +209,7 @@ class CaptureManager: ObservableObject {
     private var finalizingSessionID: UInt64?
     private var activeRecordingRequest: ActiveRecordingRequest?
     private var onboardingWindow: OnboardingWizardWindow?
+    private var whatsNewWindow: WhatsNewWindow?
     private var guideWindow: GuideWindow?
     @Published private var screenPickerWindow: ScreenPickerWindow?
     private var mouseClickMonitor: MouseClickMonitor?
@@ -2444,7 +2445,14 @@ class CaptureManager: ObservableObject {
 
     private func showOnboardingIfNeeded() {
         let settings = CaptureSettings.shared
-        guard !settings.hasCompletedOnboarding, onboardingWindow == nil else { return }
+        if settings.hasCompletedOnboarding {
+            showWhatsNewIfNeeded()
+            return
+        }
+        guard onboardingWindow == nil else { return }
+
+        // New installations get the tour, not a second introduction on their next launch.
+        CaptureSettings.markWhatsNewSeen()
 
         let window = OnboardingWizardWindow { [weak self] completed in
             if completed {
@@ -2458,6 +2466,20 @@ class CaptureManager: ObservableObject {
 
         DispatchQueue.main.async {
             self.bringWindowToFront(window)
+        }
+    }
+
+    private func showWhatsNewIfNeeded() {
+        guard whatsNewWindow == nil, CaptureSettings.shouldShowWhatsNew() else { return }
+        let window = WhatsNewWindow { [weak self] in
+            CaptureSettings.markWhatsNewSeen()
+            DispatchQueue.main.async {
+                self?.whatsNewWindow = nil
+            }
+        }
+        whatsNewWindow = window
+        DispatchQueue.main.async { [weak self] in
+            self?.bringWindowToFront(window)
         }
     }
 
