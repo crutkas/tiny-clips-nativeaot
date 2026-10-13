@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v1.8.3-mac - 2026-10-13
+
 ### Added
 - The macOS screenshot editor Text tool now includes Plain, Light, Dark, and Accent text-box styles plus custom background, border, padding, and corner controls. Styles apply to the selected text or the next text annotation and reset with each editor window. (#435)
 - macOS adds an optional global **Screenshot Screen** shortcut that skips the capture picker and captures the selected screen. It is unassigned by default and can be configured in Settings > Shortcuts. (#440)
