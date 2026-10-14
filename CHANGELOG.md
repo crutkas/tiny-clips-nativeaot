@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+- macOS GitHub releases and Sparkle update notes now use the matching changelog section instead of falling back to commit messages. Older release descriptions can be repaired with the manual **Backfill macOS release notes** workflow, without rebuilding or replacing downloads; preview with **Dry run** before applying.
+
 ## v1.8.3-mac - 2026-10-13
 
 ### Added
