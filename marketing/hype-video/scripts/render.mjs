@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import puppeteer from 'puppeteer-core';
 import { compositionPath, projectDir, startServer } from './static-server.mjs';
+import { prepareStudioFrames } from './studio-media.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
@@ -39,6 +40,7 @@ const audioFile = join(outDir, 'hype-beat.wav');
 function findBrowser() {
   const candidates = [
     process.env.BROWSER_PATH,
+    ...(process.env.LOCALAPPDATA ? [join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe')] : []),
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     '/Applications/Chromium.app/Contents/MacOS/Chromium',
@@ -101,7 +103,11 @@ async function openComposition(url) {
     const cdp = await page.createCDPSession();
     return {
       page,
-      seek: (t) => page.evaluate((time) => window.__seek(time), t),
+      seek: (t) => page.evaluate(async (time) => {
+        window.__seek(time);
+        const recording = document.getElementById('studio-recording');
+        if (recording) await recording.decode();
+      }, t),
       capture: async () => {
         const { data } = await cdp.send('Page.captureScreenshot', frameFormat);
         return Buffer.from(data, 'base64');
@@ -114,6 +120,7 @@ async function openComposition(url) {
   }
 }
 
+await prepareStudioFrames();
 const { server, port } = await startServer();
 const url = `http://127.0.0.1:${port}${compositionPath}?render`;
 try {

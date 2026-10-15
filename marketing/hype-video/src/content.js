@@ -1,5 +1,5 @@
 // What the video says about the latest releases. To hype new features, edit this file and
-// re-render; the intro, core-feature scenes, and outro stay the same.
+// re-render. This cut leads with Studio; the download outro stays the same.
 //
 // tiles: 3 to 6 entries, shown in order, one landing every few beats.
 //   title   one line, about 22 characters or fewer
@@ -18,19 +18,19 @@
 // The renderer refuses to run if a tile's text does not fit, so check with `npm run review`.
 window.HYPE_CONTENT = {
   breakdown: {
-    lead: 'And it keeps getting better.',
-    title: 'What’s new',
+    lead: 'Beyond Studio.',
+    title: 'More tiny upgrades.',
   },
   whatsNew: {
-    pill: 'What’s new',
-    heading: 'Fresh from the latest releases',
+    pill: 'Tiny Clips 2.0',
+    heading: 'And so much more.',
     platforms: 'macOS + Windows',
     tiles: [
       {
         title: 'WebP screenshots',
         blurb: 'Smaller files with adjustable quality.',
         accent: 'cyan',
-        visual: { type: 'compare', from: 'PNG', to: 'WebP', ratio: 0.42 },
+        visual: { type: 'toggle', from: 'PNG', to: 'WebP', caption: 'Your choice' },
       },
       {
         title: 'H.265 video',
@@ -40,12 +40,12 @@ window.HYPE_CONTENT = {
       },
       {
         title: 'Emoji stickers',
-        blurb: 'Drop, resize, and rotate anything.',
+        blurb: 'Drag, resize, and rotate stickers.',
         accent: 'orange',
         visual: { type: 'emoji', emoji: ['😎', '🎉', '👀'] },
       },
       {
-        title: 'Export at any scale',
+        title: 'Scale your exports',
         blurb: 'Click the resolution, pick 10–100%.',
         accent: 'green',
         visual: { type: 'slider', from: 100, to: 50, unit: '%', size: [1920, 1080] },
@@ -57,7 +57,7 @@ window.HYPE_CONTENT = {
         visual: { type: 'list' },
       },
       {
-        title: 'Clip details pane',
+        title: 'Your clips, organized',
         blurb: 'Preview, tag, and share in one place.',
         accent: 'blue',
         visual: { type: 'panel', tags: ['demo', 'bug', 'ui'] },

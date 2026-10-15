@@ -623,7 +623,7 @@ kbd {
 @keyframes seg-slide { to { translate: 100% 0; } }
 .v-toggle em { font-style: normal; font-size: 30px; font-weight: 800; letter-spacing: 0.3em; color: var(--accent); }
 
-.v-emoji { display: flex; align-items: center; justify-content: center; gap: 44px; font-size: 110px; }
+.v-emoji { display: flex; align-items: center; justify-content: center; gap: 26px; font-size: 92px; }
 .e { position: relative; display: inline-block; line-height: 1; }
 .e1 { rotate: -12deg; } .e3 { rotate: 10deg; }
 .e2 { padding: 10px; border: 4px dashed #fff; border-radius: 12px; animation: sticker-rot calc(var(--beat) * 2) ease-in-out calc(var(--start) + var(--at) + 0.3s) both; }
@@ -695,6 +695,94 @@ kbd {
 .rings i:nth-child(2) { animation-delay: calc(var(--start) + 0.18s); }
 .rings i:nth-child(3) { animation-delay: calc(var(--start) + var(--beat) * 8); }
 @keyframes outro-ring { from { opacity: 0.8; scale: 0.6; } to { opacity: 0; scale: 7; } }
+
+/* ---- Studio 2.0 release cut --------------------------------------------------------------- */
+
+.s-studio-title { text-align: center; }
+.release-lockup { position: absolute; top: 130px; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 24px; font-size: 44px; font-weight: 700; }
+.release-lockup svg { width: 76px; height: 76px; }
+.s-studio-title > .kicker { position: absolute; top: 340px; left: 0; right: 0; color: var(--cyan); }
+.s-studio-title h1 { position: absolute; top: 410px; left: 0; right: 0; font-size: 196px; line-height: 1.1; font-weight: 800; letter-spacing: -0.055em; }
+.s-studio-title h1 span { color: var(--cyan); }
+.studio-platforms { position: absolute; top: 720px; left: 0; right: 0; font-size: 36px; color: var(--lav); }
+.studio-platforms span { margin-left: 30px; padding: 10px 22px; border: 1px solid var(--line); border-radius: 30px; font-size: 26px; vertical-align: middle; }
+.studio-copy { position: absolute; left: 100px; top: 230px; width: 650px; }
+.studio-copy h2 { margin: 30px 0; font-size: 88px; line-height: 1.06; font-weight: 750; }
+.studio-copy > p { font-size: 38px; line-height: 1.4; color: var(--lav); }
+.studio-labels { display: grid; gap: 16px; margin-top: 38px; font-size: 30px; color: var(--cyan); }
+.studio-demo { position: relative; overflow: hidden; border-radius: 28px; background: var(--surface); }
+.s-studio-layout > .studio-demo { position: absolute; left: 810px; top: 205px; width: 1010px; height: 650px; box-shadow: 0 40px 120px #0007; border: 1px solid var(--line); }
+.demo-backdrop { position: absolute; inset: 0; background: linear-gradient(135deg, #187cc1, #38dcc7); }
+.demo-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, #3056a1, #a08bfa); animation: a-fade 1.2s ease calc(var(--start) + var(--beat) * 11) both; }
+.demo-screen { position: absolute; left: 6%; top: 10%; width: 88%; height: 80%; animation: studio-screen var(--dur) var(--out) var(--start) both; }
+.demo-screen .win { border-radius: 18px; }
+.demo-camera { position: absolute; overflow: hidden; left: 76%; top: 64%; width: 19%; height: 28%; border: 4px solid #fff; border-radius: 999px; background: #d1e5ee; box-shadow: 0 14px 32px #0004; animation: studio-camera var(--dur) var(--out) var(--start) both; }
+.demo-camera svg { display: block; width: 100%; height: 100%; object-fit: cover; }
+@keyframes studio-screen {
+  0%, 28% { left: 6%; top: 10%; width: 88%; height: 80%; }
+  43%, 66% { left: 6%; top: 14%; width: 58%; height: 72%; }
+  82%, 100% { left: 10%; top: 18%; width: 54%; height: 64%; }
+}
+@keyframes studio-camera {
+  0%, 28% { left: 76%; top: 64%; width: 19%; height: 28%; border-radius: 999px; }
+  43%, 66% { left: 68%; top: 14%; width: 26%; height: 72%; border-radius: 22px; }
+  82%, 100% { left: 68%; top: 18%; width: 22%; height: 64%; border-radius: 22px; }
+}
+.demo-layout-label { position: absolute; left: 0; right: 0; bottom: 3%; text-align: center; height: 30px; font-size: 22px; font-weight: 700; color: #fff; text-shadow: 0 2px 8px #0008; }
+.demo-layout-label span { position: absolute; left: 0; right: 0; animation: bubble-label var(--dur) linear var(--start) both; }
+.demo-layout-label span + span { animation-name: side-label; }
+@keyframes bubble-label { 0%, 35% { opacity: 1; } 40%, 100% { opacity: 0; } }
+@keyframes side-label { 0%, 35% { opacity: 0; } 40%, 100% { opacity: 1; } }
+.studio-footnote { position: absolute; left: 810px; top: 900px; width: 1010px; text-align: center; color: var(--lav); font-size: 27px; }
+.studio-heading { position: absolute; left: 100px; right: 100px; top: 44px; display: flex; justify-content: space-between; align-items: end; }
+.studio-heading .kicker { font-size: 25px; color: var(--cyan); }
+.studio-heading h2 { margin-top: 12px; font-size: 66px; font-weight: 750; }
+.studio-heading > p { text-align: right; font-size: 22px; line-height: 1.5; color: var(--lav); }
+.studio-footage { position: absolute; left: 230px; top: 210px; width: 1460px; border-radius: 18px; overflow: hidden; box-shadow: 0 35px 100px #0008; }
+.studio-footage > img { display: block; width: 100%; }
+.recorded-canvas { position: absolute; left: 0.15%; top: 12.8%; width: 68.45%; height: 56.4%; overflow: hidden; }
+.recorded-canvas .studio-demo { position: absolute; inset: 0; border-radius: 0; }
+.recorded-canvas .demo-screen { top: 10%; }
+.recorded-canvas .win-body aside { padding: 15px; gap: 12px; }
+.recorded-canvas .win-body main { padding: 16px; gap: 12px; }
+.recorded-canvas .m-cards { gap: 10px; }
+.recorded-canvas .m-cards div { padding: 10px; gap: 8px; }
+.s-studio-edit { text-align: center; }
+.s-studio-edit > .kicker { position: absolute; top: 68px; left: 0; right: 0; }
+.s-studio-edit > h2 { position: absolute; top: 130px; left: 0; right: 0; font-size: 108px; font-weight: 750; }
+.edit-actions { position: absolute; left: 270px; right: 270px; top: 300px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+.edit-actions > div { display: grid; justify-items: center; gap: 14px; }
+.edit-actions strong { font-size: 36px; font-weight: 700; }
+.edit-actions span { font-size: 26px; color: var(--lav); }
+.studio-timeline { position: absolute; left: 260px; right: 260px; top: 550px; padding: 22px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); text-align: left; display: grid; gap: 10px; }
+.studio-timeline > div { position: relative; height: 36px; border-radius: 6px; background: #ffffff08; }
+.demo-scenes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.studio-timeline span { display: block; padding: 5px 18px; font-size: 20px; font-weight: 600; border-radius: 6px; }
+.demo-scenes span { background: #567dff40; border: 1px solid #567dff80; }
+.demo-zooms span { margin-left: 20%; width: 20%; background: #31b8f555; border: 1px solid var(--cyan); }
+.demo-cuts span { margin-left: 47%; width: 9%; background: #ff657b44; border: 1px solid var(--red); animation: a-fade 0.4s var(--out) calc(var(--start) + var(--beat) * 3) both; }
+.demo-speed span { margin-left: 68%; width: 17%; background: #af8fff44; border: 1px solid var(--pink); }
+.demo-track { background: repeating-linear-gradient(90deg, #567dff55 0 24px, #31b8f533 24px 48px) !important; }
+.demo-playhead { position: absolute; top: 16px; bottom: 16px; width: 2px; background: #fff; box-shadow: 0 0 14px #fff6; animation: studio-playhead calc(var(--beat) * 8) linear calc(var(--start) + var(--beat) * 2) both; }
+@keyframes studio-playhead { from { left: 3%; } 48% { left: 47%; } 49% { left: 56%; } to { left: 97%; } }
+.studio-export { position: absolute; top: 860px; left: 0; right: 0; font-size: 40px; color: var(--lav); }
+.studio-export b { color: #fff; }
+.studio-enable { position: absolute; top: 946px; left: 0; right: 0; font-size: 27px; color: var(--lav); }
+.editor-caption { position: absolute; left: 110px; top: 70px; font-size: 40px; color: var(--lav); }
+.s-editor-b .tool-list { top: 225px; gap: 26px; }
+.s-editor-b .tool-list li, .s-editor-b .tool-list li::before { animation-duration: calc(var(--beat) * 1.5); }
+.s-editor-b .tool-list li.long, .s-editor-b .tool-list li.long::before { animation-duration: calc(var(--beat) * 4.5); }
+.s-editor-b .canvas { top: 200px; }
+.s-editor-b .canvas-card { animation-delay: calc(var(--start) + var(--beat) * 7.5); }
+.s-toolkit { text-align: center; }
+.s-toolkit > .kicker { position: absolute; left: 0; right: 0; top: 115px; color: var(--cyan); }
+.s-toolkit > h2 { position: absolute; left: 0; right: 0; top: 200px; font-size: 108px; font-weight: 750; }
+.capture-formats { position: absolute; left: 180px; right: 180px; top: 390px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.capture-formats > div { padding: 48px 20px; border: 1px solid var(--line); background: var(--surface); border-radius: 28px; display: grid; justify-items: center; gap: 24px; }
+.capture-formats svg { width: 86px; height: 86px; color: var(--cyan); }
+.capture-formats strong { font-size: 48px; }
+.capture-formats span { font-size: 28px; color: var(--lav); }
+.toolkit-note { position: absolute; left: 0; right: 0; top: 875px; font-size: 38px; color: var(--lav); }
 
 /* ---- Preview chrome (never rendered) ------------------------------------------------------ */
 

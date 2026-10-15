@@ -1,8 +1,9 @@
 # Tiny Clips hype video
 
-A 45-second, 1920×1080, 60 fps promo for Tiny Clips, built entirely from code: the picture is an
-HTML/CSS composition rendered frame by frame in a headless browser, and the soundtrack is
-synthesized in Node, so there is no stock footage or licensed music to track.
+A 45-second, 1920×1080, 60 fps promo for Tiny Clips. The Studio 2.0 cut combines an animated
+HTML/CSS composition with user-supplied Studio footage, rendered frame by frame in a headless
+browser. The polished lo-fi soundtrack is synthesized locally in Node.
+The selected creative profile uses subtle motion and an ice (cyan/blue/violet) palette.
 
 ## Hype a new release
 
@@ -44,21 +45,42 @@ Everything is cut to a 128 BPM grid: one bar is 1.875 s and the piece is 24 bars
 
 | Bars | Time | Scene |
 | --- | --- | --- |
-| 0–2 | 0:00 | A region selection turns into the app icon, then the wordmark |
-| 2–5 | 0:03.75 | Screenshot, Video, GIF — one bar each |
-| 5–6 | 0:09.4 | Capture picker: Region, Screen, Window |
-| 6–8 | 0:11.25 | Menu bar and system tray, global hotkeys |
-| 8–11 | 0:15 | Screenshot editor, then one tool per beat |
-| 11–13 | 0:20.6 | Video and GIF trimmers |
-| 13–16 | 0:24.4 | Six features, two beats each: webcam overlay, mic + system audio, teleprompter, scrolling capture, OCR, clips library |
-| 16–17 | 0:30 | Breakdown line from `content.js` |
-| 17–21 | 0:31.9 | What’s new tiles from `content.js` |
+| 0–1 | 0:00 | Tiny Clips 2.0: Hello, Studio |
+| 1–5 | 0:01.875 | Animated separate screen/camera layers, bubble to side-by-side layouts, backgrounds and padding |
+| 5–9 | 0:09.375 | Actual Windows Studio controls/timeline with a privacy-safe, illustrative animated canvas |
+| 9–12 | 0:16.875 | Zoom, cut, speed, MP4 export, editable projects, and enabling Studio Preview |
+| 12–15 | 0:22.5 | Screenshot editor: arrows, steps, redaction, stickers, text, backgrounds |
+| 15–17 | 0:28.125 | Screenshot, video, GIF; microphone and system audio; menu bar and tray |
+| 17–21 | 0:31.875 | Six recent cross-platform features from `content.js` |
 | 21–24 | 0:39.4 | Tiny Clips · Available on macOS and Windows · tinyclips.app |
+
+Studio owns exactly the first 22.5 seconds, including the release title. Its early-preview
+status and opt-in setting are explicit; ordinary video recording is not presented as Studio.
+The second half highlights shipped cross-platform additions, rather than implying every tile
+first shipped in 2.0. The established download outro is unchanged.
+
+### Recorded Studio media
+
+`assets/studio-demo.mp4` is a silent 7.5-second excerpt (8.0–15.5 seconds) of the supplied
+2026-10-15 Studio recording. The original preview area is **removed from the encoded asset**,
+not just hidden in CSS, so nested conversation and project text cannot leak into the video.
+The real inspector, controls, cursor, and timeline remain. The composition replaces the
+removed preview with a clean animated illustration, labeled as such.
+
+`scripts/studio-media.mjs` extracts 225 JPEG frames into ignored `out/studio-frames/` before
+review, rendering, or preview. Rendering waits for each selected frame to decode, so seeking
+backward, parallel workers, and still exports all produce the correct frame. Source footage
+is 30 fps, held for two frames in the 60 fps final; the surrounding animation is native 60 fps.
+Missing or short media fails explicitly.
+
+To replace the footage, use an approved 7.5-second, 30 fps clip, remove private content before
+putting it in `assets/`, and adjust the illustrative canvas bounds in `src/styles.css` if the
+editor's geometry changes. Do not commit the unredacted original.
 
 ## Editing it
 
 - `src/content.js` holds the release-specific copy: the “What’s new” tiles (3 to 6), their
-  visuals, and the breakdown line. This is the only file a new release normally touches.
+  visuals,   and an optional breakdown line. The Studio-first storyboard also lives in `src/index.html`.
 - `src/creative.js` holds the selected campaign angle, hype level, motion intensity, music style,
   and visual palette. The `hype-video` skill asks about any choices not specified in the request.
   Supported values are:

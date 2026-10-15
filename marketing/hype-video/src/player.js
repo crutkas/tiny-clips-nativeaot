@@ -80,7 +80,7 @@
   document.documentElement.style.setProperty('--motion-tile', motion.tile);
 
   const tagline = document.getElementById('campaign-tagline');
-  for (const [i, text] of CAMPAIGN_TAGLINES[creative.campaign].entries()) {
+  for (const [i, text] of (tagline ? CAMPAIGN_TAGLINES[creative.campaign] : []).entries()) {
     const word = document.createElement('span');
     word.className = 'a-pop';
     word.dataset.at = String(5.5 + i * 0.5);
@@ -198,9 +198,12 @@
     const news = content.whatsNew ?? {};
     const tiles = news.tiles ?? [];
     const lead = document.getElementById('break-lead');
-    lead.textContent = content.breakdown?.lead ?? '';
-    lead.dataset.split = 'a-up';
-    document.getElementById('break-title').textContent = content.breakdown?.title ?? '';
+    if (lead) {
+      lead.textContent = content.breakdown?.lead ?? '';
+      lead.dataset.split = 'a-up';
+    }
+    const breakTitle = document.getElementById('break-title');
+    if (breakTitle) breakTitle.textContent = content.breakdown?.title ?? '';
     document.getElementById('new-pill').textContent = news.pill ?? '';
     document.getElementById('new-heading').textContent = news.heading ?? '';
     document.getElementById('new-platforms').textContent = news.platforms ?? '';
@@ -244,6 +247,20 @@
         <div class="m-lines"><span class="l" style="width:86%"></span><span class="l" style="width:64%"></span></div>
       </main>
     </div>`;
+  for (const demo of document.querySelectorAll('[data-studio-demo]')) {
+    demo.innerHTML = `
+      <div class="demo-backdrop"></div>
+      <div class="demo-screen"><div class="win" data-mock="app"></div></div>
+      <div class="demo-camera">
+        <svg viewBox="0 0 200 240" aria-hidden="true">
+          <ellipse cx="100" cy="240" rx="90" ry="100" fill="#567dff"/>
+          <rect x="80" y="117" width="40" height="63" rx="18" fill="#dba58c"/>
+          <ellipse cx="100" cy="88" rx="48" ry="61" fill="#f1c6ad"/>
+          <path d="M50 94C35 3 162-15 153 94L137 56C112 81 87 51 63 68Z" fill="#162d49"/>
+        </svg>
+      </div>
+      <div class="demo-layout-label"><span>Camera bubble</span><span>Side by side</span></div>`;
+  }
   for (const el of document.querySelectorAll('[data-mock="app"]')) el.innerHTML = MOCK_APP;
 
   // A capture card shows the same mock, offset so it lines up with the region that was selected.
@@ -355,6 +372,11 @@
   // ---- Seeking -------------------------------------------------------------------------------
 
   let animations = [];
+  const recording = document.getElementById('studio-recording');
+  const recordingScene = recording?.closest('.scene');
+  const recordingStart = recordingScene ? Number(recordingScene.dataset.bar) * BAR : 0;
+  const recordingEnd = recordingScene ? recordingStart + Number(recordingScene.dataset.bars) * BAR : 0;
+  let recordingFrame = 0;
   function seek(t) {
     const clamped = Math.max(0, Math.min(DURATION - 1e-4, t));
     const ms = clamped * 1000;
@@ -365,12 +387,25 @@
     }
     const frame = Math.round(clamped * 60);
     grain.style.backgroundPosition = `${(frame * 89) % 256}px ${(frame * 151) % 256}px`;
+    if (recording && clamped >= recordingStart && clamped < recordingEnd) {
+      const nextFrame = Math.min(224, Math.floor((clamped - recordingStart) * 30));
+      if (nextFrame !== recordingFrame) {
+        recording.src = `../out/studio-frames/frame-${String(nextFrame).padStart(3, '0')}.jpg`;
+        recordingFrame = nextFrame;
+      }
+    }
     return clamped;
   }
 
   async function init() {
     await document.fonts.ready;
-    await Promise.all([...document.images].map((img) => img.decode().catch(() => {})));
+    await Promise.all([...document.images].map(async (img) => {
+      try {
+        await img.decode();
+      } catch {
+        problems.push(`Image could not be loaded: ${img.getAttribute('src')}`);
+      }
+    }));
     fitBreakTitle();
     animations = document.getAnimations();
     for (const a of animations) a.pause();
@@ -389,6 +424,7 @@
   // The breakdown title grows to 112% and must stay inside the frame at any length.
   function fitBreakTitle() {
     const title = document.getElementById('break-title');
+    if (!title) return;
     const probe = title.cloneNode(true);
     probe.removeAttribute('id');
     probe.style.cssText = 'position:absolute;left:auto;right:auto;top:0;visibility:hidden;animation:none;letter-spacing:-0.045em;';
@@ -406,6 +442,15 @@
   }
 
   function validate() {
+    const scenes = [...document.querySelectorAll('.scene')];
+    let end = 0;
+    for (const scene of scenes) {
+      const start = Number(scene.dataset.bar);
+      const bars = Number(scene.dataset.bars);
+      if (start !== end || bars <= 0) problems.push(`Timeline gap, overlap, or invalid duration at bar ${start}.`);
+      end = start + bars;
+    }
+    if (end !== BARS) problems.push(`Timeline must end at bar ${BARS}, found ${end}.`);
     seek(20.99 * BAR); // every tile has landed and settled
     document.querySelectorAll('#new-tiles .tile').forEach((tile, i) => {
       const title = tile.querySelector('h3');
@@ -430,7 +475,9 @@
   // One frame late in every scene, plus one as each "what's new" tile lands.
   function reviewTimes() {
     const times = [...document.querySelectorAll('.scene')].map((scene) => (parseFloat(scene.dataset.bar) + parseFloat(scene.dataset.bars) * 0.85) * BAR);
-    for (const tile of document.querySelectorAll('#new-tiles .tile')) times.push(17 * BAR + (parseFloat(tile.dataset.at) + 1.5) * BEAT);
+    const newsStart = Number(document.getElementById('whats-new').dataset.bar) * BAR;
+    for (const tile of document.querySelectorAll('#new-tiles .tile')) times.push(newsStart + (parseFloat(tile.dataset.at) + 1.5) * BEAT);
+    for (const bar of [2, 3.5, 5.5, 7, 9.5, 11, 12.75, 13.5, 14.5]) times.push(bar * BAR);
     times.push(DURATION - 0.05);
     return [...new Set(times.map((t) => Math.round(t * 100) / 100))].sort((a, b) => a - b);
   }
