@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+- macOS Settings > Shortcuts now has a **Clear** button to unassign a shortcut without resetting it to its default. (#450)
+
 ### Changed
 - Only the **Screenshot**, **Record Video**, and **Record GIF** global shortcuts are assigned by default on macOS. **Copy Text from Region**, **Screenshot Region**, **Screenshot Window**, and **Screenshot Screen** now start unassigned and can be set in Settings > Shortcuts. (#451)
 
