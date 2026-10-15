@@ -148,6 +148,7 @@ public sealed partial class EditorInspector : UserControl
 
         BgStyleCombo.SelectedIndex = 0;
         BgColorPicker.Color = _controller.BgColor;
+        GradientDirectionSlider.Value = _controller.GradientDirectionDegrees;
         PaddingSlider.Value = _controller.CanvasPadding;
         CornerSlider.Value = _controller.CanvasCornerRadius;
         ShadowSlider.Value = _controller.CanvasShadow;
@@ -741,6 +742,7 @@ public sealed partial class EditorInspector : UserControl
     {
         SolidPresetGrid.Visibility = _controller.BgStyle == ExportBackgroundStyle.Solid ? Visibility.Visible : Visibility.Collapsed;
         GradientPresetGrid.Visibility = _controller.BgStyle == ExportBackgroundStyle.Gradient ? Visibility.Visible : Visibility.Collapsed;
+        GradientDirectionSlider.Visibility = _controller.BgStyle == ExportBackgroundStyle.Gradient ? Visibility.Visible : Visibility.Collapsed;
         CustomColorPanel.Visibility = _controller.BgStyle == ExportBackgroundStyle.Solid ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -773,6 +775,17 @@ public sealed partial class EditorInspector : UserControl
         }
 
         _controller.SetPadding(e.NewValue);
+        UpdateSliderHeaders();
+    }
+
+    private void OnGradientDirectionChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_bgInitializing)
+        {
+            return;
+        }
+
+        _controller.SetGradientDirectionDegrees(e.NewValue);
         UpdateSliderHeaders();
     }
 
@@ -864,6 +877,7 @@ public sealed partial class EditorInspector : UserControl
     private void UpdateSliderHeaders()
     {
         PaddingSlider.Header = $"Padding — {(int)_controller.CanvasPadding} px";
+        GradientDirectionSlider.Header = $"Direction — {(int)_controller.GradientDirectionDegrees}°";
         CornerSlider.Header = $"Image corners — {(int)_controller.CanvasCornerRadius} px";
         ShadowSlider.Header = $"Shadow — {(int)_controller.CanvasShadow}";
     }

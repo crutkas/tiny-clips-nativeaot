@@ -156,12 +156,13 @@ struct ScreenshotEditorCanvasView: View {
                             y: containerSize.height / 2 + panOffset.height
                         )
                 } else if viewModel.backgroundStyle == .gradient {
+                    let endpoints = ScreenshotGradientMath.endpoints(degrees: viewModel.gradientDirectionDegrees)
                     Rectangle()
                         .fill(
                             LinearGradient(
                                 colors: [viewModel.backgroundColor, viewModel.backgroundSecondaryColor],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                                startPoint: endpoints.start,
+                                endPoint: endpoints.end
                             )
                         )
                         .frame(width: frameSize.width, height: frameSize.height)

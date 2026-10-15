@@ -9,6 +9,28 @@ namespace TinyClips.Core.Tests;
 public sealed class ScreenshotExportTests
 {
     [Theory]
+    [InlineData(0, 0, 0.5, 1, 0.5)]
+    [InlineData(45, 0, 0, 1, 1)]
+    [InlineData(90, 0.5, 0, 0.5, 1)]
+    [InlineData(180, 1, 0.5, 0, 0.5)]
+    [InlineData(270, 0.5, 1, 0.5, 0)]
+    [InlineData(360, 0, 0.5, 1, 0.5)]
+    public void GradientMath_CalculatesDirectionEndpoints(
+        double degrees, double startX, double startY, double endX, double endY)
+    {
+        var endpoints = ScreenshotGradientMath.Endpoints(degrees);
+
+        Assert.Equal(startX, endpoints.Start.X, 10);
+        Assert.Equal(startY, endpoints.Start.Y, 10);
+        Assert.Equal(endX, endpoints.End.X, 10);
+        Assert.Equal(endY, endpoints.End.Y, 10);
+    }
+
+    [Fact]
+    public void GradientMath_RejectsNonFiniteDirection() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotGradientMath.Endpoints(double.NaN));
+
+    [Theory]
     [InlineData(1920, 1080, 100, 1920, 1080)]
     [InlineData(1920, 1080, 50, 960, 540)]
     [InlineData(101, 99, 50, 50, 50)]
@@ -171,7 +193,7 @@ public sealed class ScreenshotExportTests
             ExportHorizontalAlignment.Left, ExportVerticalAlignment.Bottom);
         var state = new ScreenshotRenderState(annotations.Select(a => a.CaptureSnapshot()).ToImmutableArray(),
             frame, ExportBackgroundStyle.Gradient, Color.FromArgb(255, 1, 2, 3),
-            Color.FromArgb(255, 4, 5, 6), 20, 16, true, ScreenshotExportSize.Create(frame.FrameSize, 50));
+            Color.FromArgb(255, 4, 5, 6), 123, 20, 16, true, ScreenshotExportSize.Create(frame.FrameSize, 50));
         annotations.Reverse();
         annotations.Clear();
 
@@ -179,6 +201,7 @@ public sealed class ScreenshotExportTests
         Assert.Equal(ExportBackgroundStyle.Gradient, state.BackgroundStyle);
         Assert.Equal(Color.FromArgb(255, 1, 2, 3), state.BackgroundColor);
         Assert.Equal(Color.FromArgb(255, 4, 5, 6), state.BackgroundColor2);
+        Assert.Equal(123, state.GradientDirectionDegrees);
         Assert.Equal(20, state.CornerRadius);
         Assert.Equal(16, state.Shadow);
         Assert.Equal(200, state.OutputSize.Width);

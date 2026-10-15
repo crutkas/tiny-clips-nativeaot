@@ -502,7 +502,12 @@ public sealed partial class EditorCanvas : UserControl
     {
         if (_controller.BgStyle == ExportBackgroundStyle.Gradient)
         {
-            var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+            var endpoints = ScreenshotGradientMath.Endpoints(_controller.GradientDirectionDegrees);
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Point(endpoints.Start.X, endpoints.Start.Y),
+                EndPoint = new Point(endpoints.End.X, endpoints.End.Y),
+            };
             brush.GradientStops.Add(new GradientStop { Color = _controller.BgColor, Offset = 0 });
             brush.GradientStops.Add(new GradientStop { Color = _controller.BgColor2, Offset = 1 });
             return brush;

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+- The macOS screenshot editor now lets you set gradient backgrounds to any direction from 0° to 360°, with the preview and exported image staying in sync. (#463)
+
 ## v1.8.3-mac - 2026-10-13
 
 ### Added

@@ -3,6 +3,30 @@ import SwiftUI
 
 let textSystemFontFamily = "System"
 
+enum ScreenshotGradientMath {
+    static func endpoints(degrees: Double) -> (start: UnitPoint, end: UnitPoint) {
+        let normalizedDegrees = degrees.truncatingRemainder(dividingBy: 360)
+        let radians = normalizedDegrees * .pi / 180
+        let directionX = cos(radians)
+        let directionY = sin(radians)
+        let halfLength = min(
+            0.5 / max(abs(directionX), 1e-12),
+            0.5 / max(abs(directionY), 1e-12)
+        )
+
+        return (
+            UnitPoint(
+                x: CGFloat(0.5 - directionX * halfLength),
+                y: CGFloat(0.5 - directionY * halfLength)
+            ),
+            UnitPoint(
+                x: CGFloat(0.5 + directionX * halfLength),
+                y: CGFloat(0.5 + directionY * halfLength)
+            )
+        )
+    }
+}
+
 enum TextBoxPreset: String, CaseIterable, Identifiable {
     case plain
     case light

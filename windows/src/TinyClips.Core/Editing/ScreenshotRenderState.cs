@@ -352,6 +352,7 @@ public sealed record ScreenshotRenderState(
     ExportBackgroundStyle BackgroundStyle,
     Color BackgroundColor,
     Color BackgroundColor2,
+    double GradientDirectionDegrees,
     double CornerRadius,
     double Shadow,
     bool IncludeBackground,

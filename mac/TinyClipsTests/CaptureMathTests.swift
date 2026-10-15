@@ -1,8 +1,28 @@
 import CoreMedia
+import SwiftUI
 import XCTest
 @testable import TinyClips
 
 final class CaptureMathTests: XCTestCase {
+    func testScreenshotGradientMathSupportsFullCircleDirections() {
+        let cases: [(Double, UnitPoint, UnitPoint)] = [
+            (0, UnitPoint(x: 0, y: 0.5), UnitPoint(x: 1, y: 0.5)),
+            (45, UnitPoint(x: 0, y: 0), UnitPoint(x: 1, y: 1)),
+            (90, UnitPoint(x: 0.5, y: 0), UnitPoint(x: 0.5, y: 1)),
+            (180, UnitPoint(x: 1, y: 0.5), UnitPoint(x: 0, y: 0.5)),
+            (270, UnitPoint(x: 0.5, y: 1), UnitPoint(x: 0.5, y: 0)),
+            (360, UnitPoint(x: 0, y: 0.5), UnitPoint(x: 1, y: 0.5)),
+        ]
+
+        for (degrees, expectedStart, expectedEnd) in cases {
+            let endpoints = ScreenshotGradientMath.endpoints(degrees: degrees)
+            XCTAssertEqual(endpoints.start.x, expectedStart.x, accuracy: 0.0001)
+            XCTAssertEqual(endpoints.start.y, expectedStart.y, accuracy: 0.0001)
+            XCTAssertEqual(endpoints.end.x, expectedEnd.x, accuracy: 0.0001)
+            XCTAssertEqual(endpoints.end.y, expectedEnd.y, accuracy: 0.0001)
+        }
+    }
+
     func testTextBoxStyleDecoratesClampsAndScalesBounds() {
         let style = TextBoxStyle(
             preset: .dark,
