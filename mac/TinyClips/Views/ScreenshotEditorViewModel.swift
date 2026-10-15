@@ -66,6 +66,7 @@ class ScreenshotEditorViewModel: ObservableObject {
     @Published var backgroundStyle: ExportBackgroundStyle = .transparent
     @Published var backgroundColor: Color = Color(red: 0.96, green: 0.96, blue: 0.98)
     @Published var backgroundSecondaryColor: Color = Color(red: 0.84, green: 0.90, blue: 0.99)
+    @Published var gradientDirectionDegrees: Double = 45
     @Published var selectedBackgroundPresetID: String = "transparent"
     @Published var wallpaperImage: NSImage?
     @Published var canvasPadding: CGFloat = 0
@@ -100,6 +101,7 @@ class ScreenshotEditorViewModel: ObservableObject {
     private var initialBackgroundStyle: ExportBackgroundStyle
     private var initialBackgroundColor: Color
     private var initialBackgroundSecondaryColor: Color
+    private var initialGradientDirectionDegrees: Double
     private var initialSelectedBackgroundPresetID: String
     private var initialWallpaperPresent: Bool
     private var initialCanvasPadding: CGFloat
@@ -126,6 +128,7 @@ class ScreenshotEditorViewModel: ObservableObject {
         self.initialBackgroundStyle = .transparent
         self.initialBackgroundColor = Color(red: 0.96, green: 0.96, blue: 0.98)
         self.initialBackgroundSecondaryColor = Color(red: 0.84, green: 0.90, blue: 0.99)
+        self.initialGradientDirectionDegrees = 45
         self.initialSelectedBackgroundPresetID = "transparent"
         self.initialWallpaperPresent = false
         self.initialCanvasPadding = 0
@@ -571,6 +574,11 @@ class ScreenshotEditorViewModel: ObservableObject {
         }
 
         if !colorsEqual(backgroundColor, initialBackgroundColor) || !colorsEqual(backgroundSecondaryColor, initialBackgroundSecondaryColor) {
+            return true
+        }
+
+        if backgroundStyle == .gradient &&
+            abs(gradientDirectionDegrees - initialGradientDirectionDegrees) > 0.0001 {
             return true
         }
 
@@ -1430,6 +1438,7 @@ class ScreenshotEditorViewModel: ObservableObject {
         initialBackgroundStyle = backgroundStyle
         initialBackgroundColor = backgroundColor
         initialBackgroundSecondaryColor = backgroundSecondaryColor
+        initialGradientDirectionDegrees = gradientDirectionDegrees
         initialSelectedBackgroundPresetID = selectedBackgroundPresetID
         initialWallpaperPresent = wallpaperImage != nil
         initialCanvasPadding = canvasPadding
@@ -1825,7 +1834,25 @@ class ScreenshotEditorViewModel: ObservableObject {
                 let colors = [NSColor(backgroundColor).cgColor, NSColor(backgroundSecondaryColor).cgColor] as CFArray
                 let colorSpace = CGColorSpaceCreateDeviceRGB()
                 if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0, 1]) {
-                    context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: outputH), end: CGPoint(x: outputW, y: 0), options: [])
+                    let endpoints = ScreenshotGradientMath.endpoints(
+                        degrees: gradientDirectionDegrees,
+                        width: Double(outputW),
+                        height: Double(outputH)
+                    )
+                    let start = CGPoint(
+                        x: endpoints.start.x * CGFloat(outputW),
+                        y: (1 - endpoints.start.y) * CGFloat(outputH)
+                    )
+                    let end = CGPoint(
+                        x: endpoints.end.x * CGFloat(outputW),
+                        y: (1 - endpoints.end.y) * CGFloat(outputH)
+                    )
+                    context.drawLinearGradient(
+                        gradient,
+                        start: start,
+                        end: end,
+                        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+                    )
                 }
             } else if backgroundStyle == .wallpaper,
                       let wallpaperImage,
