@@ -209,6 +209,7 @@ class CaptureManager: ObservableObject {
     private var finalizingSessionID: UInt64?
     private var activeRecordingRequest: ActiveRecordingRequest?
     private var onboardingWindow: OnboardingWizardWindow?
+    private var whatsNewWindow: WhatsNewWindow?
     private var guideWindow: GuideWindow?
     @Published private var screenPickerWindow: ScreenPickerWindow?
     private var mouseClickMonitor: MouseClickMonitor?
@@ -359,6 +360,8 @@ class CaptureManager: ObservableObject {
                         self.takeScreenshotInMode(.region)
                     case .screenshotWindow:
                         self.takeScreenshotInMode(.window)
+                    case .screenshotScreen:
+                        self.takeScreenshotInMode(.screen)
                     }
                 }
             )
@@ -384,7 +387,7 @@ class CaptureManager: ObservableObject {
     }
 
     /// Takes a screenshot in the given mode without showing the capture picker.
-    /// Used by the dedicated region/window screenshot hotkeys.
+    /// Used by the dedicated region/screen/window screenshot hotkeys.
     func takeScreenshotInMode(_ mode: CapturePickerMode) {
         beginScreenshot(directMode: mode)
     }
@@ -947,45 +950,46 @@ class CaptureManager: ObservableObject {
                     self.activeRecordingSessionID = sessionID
                     self.didShowVideoCodecFallbackNotice = false
                     self.debugRecordingLifecycle("Starting video session \(sessionID)")
-                    recorder.onStreamFailure = { [weak self] error in
+                    let captureManager = self
+                    recorder.onStreamFailure = { [weak captureManager] error in
                         let message = error.localizedDescription
-                        Task { @MainActor [weak self] in
-                            self?.handleStreamFailure(
+                        Task { @MainActor [weak captureManager] in
+                            captureManager?.handleStreamFailure(
                                 for: sessionID,
                                 type: .video,
                                 message: message
                             )
                         }
                     }
-                    recorder.onMicrophoneLevel = { [weak self] level in
-                        DispatchQueue.main.async {
-                            self?.microphoneLevel = level
+                    recorder.onMicrophoneLevel = { [weak captureManager] level in
+                        DispatchQueue.main.async { [weak captureManager] in
+                            captureManager?.microphoneLevel = level
                         }
                     }
-                    recorder.onMicrophoneWarning = { [weak self] warning in
-                        DispatchQueue.main.async {
-                            self?.microphoneWarningMessage = warning
+                    recorder.onMicrophoneWarning = { [weak captureManager] warning in
+                        DispatchQueue.main.async { [weak captureManager] in
+                            captureManager?.microphoneWarningMessage = warning
                         }
                     }
-                    recorder.onMicrophoneDeviceName = { [weak self] name in
-                        DispatchQueue.main.async {
-                            self?.activeMicrophoneName = name.isEmpty ? nil : name
+                    recorder.onMicrophoneDeviceName = { [weak captureManager] name in
+                        DispatchQueue.main.async { [weak captureManager] in
+                            captureManager?.activeMicrophoneName = name.isEmpty ? nil : name
                         }
                     }
-                    recorder.onMicrophoneError = { [weak self] message in
-                        DispatchQueue.main.async {
-                            self?.microphoneWarningMessage = message
+                    recorder.onMicrophoneError = { [weak captureManager] message in
+                        DispatchQueue.main.async { [weak captureManager] in
+                            captureManager?.microphoneWarningMessage = message
                             SaveService.shared.showError("Microphone error: \(message)")
                         }
                     }
-                    recorder.onVideoCodecFallback = { message in
-                        Task { @MainActor [weak self] in
-                            self?.showVideoCodecFallbackNoticeOnce(message)
+                    recorder.onVideoCodecFallback = { [weak captureManager] message in
+                        Task { @MainActor [weak captureManager] in
+                            captureManager?.showVideoCodecFallbackNoticeOnce(message)
                         }
                     }
-                    webcamRecorder.onWebcamDeviceName = { [weak self] name in
-                        DispatchQueue.main.async {
-                            self?.activeWebcamName = name.isEmpty ? nil : name
+                    webcamRecorder.onWebcamDeviceName = { [weak captureManager] name in
+                        DispatchQueue.main.async { [weak captureManager] in
+                            captureManager?.activeWebcamName = name.isEmpty ? nil : name
                         }
                     }
                     webcamRecorder.onWebcamError = { message in
@@ -993,9 +997,9 @@ class CaptureManager: ObservableObject {
                             SaveService.shared.showError("Webcam error: \(message)")
                         }
                     }
-                    webcamRecorder.onVideoCodecFallback = { message in
-                        Task { @MainActor [weak self] in
-                            self?.showVideoCodecFallbackNoticeOnce(message)
+                    webcamRecorder.onVideoCodecFallback = { [weak captureManager] message in
+                        Task { @MainActor [weak captureManager] in
+                            captureManager?.showVideoCodecFallbackNoticeOnce(message)
                         }
                     }
 
@@ -1189,10 +1193,11 @@ class CaptureManager: ObservableObject {
                     let sessionID = self.nextRecordingSessionID()
                     self.activeRecordingSessionID = sessionID
                     self.debugRecordingLifecycle("Starting GIF session \(sessionID)")
-                    writer.onStreamFailure = { [weak self] error in
+                    let captureManager = self
+                    writer.onStreamFailure = { [weak captureManager] error in
                         let message = error.localizedDescription
-                        Task { @MainActor [weak self] in
-                            self?.handleStreamFailure(
+                        Task { @MainActor [weak captureManager] in
+                            captureManager?.handleStreamFailure(
                                 for: sessionID,
                                 type: .gif,
                                 message: message
@@ -1615,6 +1620,15 @@ class CaptureManager: ObservableObject {
                     } catch {
                         try? FileManager.default.removeItem(at: brandingOutputURL)
                         SaveService.shared.showError("Video compositing failed: \(error.localizedDescription)")
+                    }
+                }
+
+                // The passes above mix the sounds as they export. A recording that went through
+                // neither is still the recorder's own file, with a track for each sound.
+                if let recordedURL = savedVideoURL {
+                    updateProcessingProgress(0.97, status: "Finalizing...")
+                    if await Self.mixDownAudioOffMain(at: recordedURL) == .failed {
+                        SaveService.shared.showError("The system audio and microphone could not be combined into one audio track. The recording was kept with two audio tracks, so some players may play it without the microphone.")
                     }
                 }
             }
@@ -2431,7 +2445,14 @@ class CaptureManager: ObservableObject {
 
     private func showOnboardingIfNeeded() {
         let settings = CaptureSettings.shared
-        guard !settings.hasCompletedOnboarding, onboardingWindow == nil else { return }
+        if settings.hasCompletedOnboarding {
+            showWhatsNewIfNeeded()
+            return
+        }
+        guard onboardingWindow == nil else { return }
+
+        // New installations get the tour, not a second introduction on their next launch.
+        CaptureSettings.markWhatsNewSeen()
 
         let window = OnboardingWizardWindow { [weak self] completed in
             if completed {
@@ -2445,6 +2466,20 @@ class CaptureManager: ObservableObject {
 
         DispatchQueue.main.async {
             self.bringWindowToFront(window)
+        }
+    }
+
+    private func showWhatsNewIfNeeded() {
+        guard whatsNewWindow == nil, CaptureSettings.shouldShowWhatsNew() else { return }
+        let window = WhatsNewWindow { [weak self] in
+            CaptureSettings.markWhatsNewSeen()
+            DispatchQueue.main.async {
+                self?.whatsNewWindow = nil
+            }
+        }
+        whatsNewWindow = window
+        DispatchQueue.main.async { [weak self] in
+            self?.bringWindowToFront(window)
         }
     }
 
@@ -2798,6 +2833,12 @@ class CaptureManager: ObservableObject {
                 codec: codec,
                 onProgress: onProgress
             )
+        }.value
+    }
+
+    nonisolated private static func mixDownAudioOffMain(at url: URL) async -> RecordingAudioMixdown.Outcome {
+        await Task.detached(priority: .userInitiated) {
+            await RecordingAudioMixdown.mixDownIfNeeded(at: url)
         }.value
     }
 

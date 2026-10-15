@@ -112,6 +112,8 @@ public interface ICaptureSettings
     WebcamCornerPosition WebcamCornerPosition { get; set; }
     double? WebcamCornerRadius { get; set; }
     bool ShowScreenshotEditor { get; set; }
+    /// <summary>Open the screenshot editor at native pixel size instead of fitting it to the viewport. Default false.</summary>
+    bool ScreenshotEditorNativeSize { get; set; }
 
     /// <summary>
     /// Ask before Esc closes the screenshot editor, video trimmer, or GIF trimmer. When false, Esc
@@ -178,6 +180,8 @@ public interface ICaptureSettings
     int ScreenshotRegionHotKeyModifiers { get; set; }
     int ScreenshotWindowHotKeyCode { get; set; }
     int ScreenshotWindowHotKeyModifiers { get; set; }
+    int ScreenshotScreenHotKeyCode { get; set; }
+    int ScreenshotScreenHotKeyModifiers { get; set; }
 
     ImageFormat ImageFormat { get; set; }
     bool ShouldCopyToClipboard(CaptureType type);

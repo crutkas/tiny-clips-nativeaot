@@ -26,6 +26,49 @@ final class CaptureSettingsTests: XCTestCase {
         XCTAssertEqual(CaptureSettings.imageFormat(from: "invalid"), .jpeg)
     }
 
+    func testWhatsNewAppearsForExistingUsersUntilDismissed() {
+        defaults.set(true, forKey: "hasCompletedOnboarding")
+        XCTAssertTrue(CaptureSettings.shouldShowWhatsNew(in: defaults))
+        XCTAssertFalse(defaults.bool(forKey: "studioPreviewEnabled"))
+
+        CaptureSettings.markWhatsNewSeen(in: defaults)
+
+        XCTAssertFalse(CaptureSettings.shouldShowWhatsNew(in: defaults))
+        XCTAssertEqual(defaults.integer(forKey: CaptureSettings.lastSeenWhatsNewRevisionKey),
+                       CaptureSettings.whatsNewContentRevision)
+        XCTAssertFalse(defaults.bool(forKey: "studioPreviewEnabled"))
+    }
+
+    func testNewInstallsSeeOnboardingInsteadOfWhatsNew() {
+        XCTAssertFalse(CaptureSettings.shouldShowWhatsNew(in: defaults))
+        CaptureSettings.markWhatsNewSeen(in: defaults)
+        defaults.set(true, forKey: "hasCompletedOnboarding")
+
+        XCTAssertFalse(CaptureSettings.shouldShowWhatsNew(in: defaults))
+    }
+
+    func testWhatsNewRevisionCanBeBumpedIndependentlyOfVersion() {
+        defaults.set(true, forKey: "hasCompletedOnboarding")
+        defaults.set(CaptureSettings.whatsNewContentRevision - 1,
+                     forKey: CaptureSettings.lastSeenWhatsNewRevisionKey)
+        XCTAssertTrue(CaptureSettings.shouldShowWhatsNew(in: defaults))
+
+        defaults.set(CaptureSettings.whatsNewContentRevision + 1,
+                     forKey: CaptureSettings.lastSeenWhatsNewRevisionKey)
+        XCTAssertFalse(CaptureSettings.shouldShowWhatsNew(in: defaults))
+    }
+
+    func testResettingSettingsDoesNotReplayWhatsNewOrEnableStudio() {
+        CaptureSettings.markWhatsNewSeen(in: defaults)
+        defaults.set(true, forKey: "studioPreviewEnabled")
+
+        CaptureSettings.resetStoredDefaults(defaults)
+
+        defaults.set(true, forKey: "hasCompletedOnboarding")
+        XCTAssertFalse(CaptureSettings.shouldShowWhatsNew(in: defaults))
+        XCTAssertFalse(defaults.bool(forKey: "studioPreviewEnabled"))
+    }
+
     func testVideoCodecDefaultsAndFallsBackToH264() {
         XCTAssertEqual(CaptureSettings.videoCodec(from: nil), .h264)
         XCTAssertEqual(CaptureSettings.videoCodec(from: "h264"), .h264)
@@ -49,6 +92,14 @@ final class CaptureSettingsTests: XCTestCase {
 
         XCTAssertNil(defaults.object(forKey: CaptureSettings.videoCodecKey))
         XCTAssertEqual(CaptureSettings.videoCodec(in: defaults), .h264)
+    }
+
+    func testScreenshotEditorNativeSizeIsResetWithStoredSettings() {
+        defaults.set(true, forKey: CaptureSettings.screenshotEditorNativeSizeKey)
+
+        CaptureSettings.resetStoredDefaults(defaults)
+
+        XCTAssertNil(defaults.object(forKey: CaptureSettings.screenshotEditorNativeSizeKey))
     }
 
     func testRecordingVideoCodecResolverDefaultsToH264() {
@@ -176,5 +227,15 @@ final class CaptureSettingsTests: XCTestCase {
                 custom
             )
         }
+    }
+
+    func testScreenshotScreenHotKeyTreatsLegacyZeroPairAsUnbound() {
+        defaults.set(0, forKey: "screenshotScreenHotKeyCode")
+        defaults.set(0, forKey: "screenshotScreenHotKeyModifiers")
+
+        XCTAssertEqual(
+            CaptureSettings.hotKeyBinding(for: .screenshotScreen, defaults: defaults),
+            HotKeyBinding.defaultBinding(for: .screenshotScreen)
+        )
     }
 }

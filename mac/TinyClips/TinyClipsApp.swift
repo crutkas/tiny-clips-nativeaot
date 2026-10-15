@@ -155,7 +155,7 @@ private struct SingleInstanceActivationHandler: View {
             .onAppear {
                 handleActivationRequestIfNeeded()
             }
-            .onChange(of: coordinator.activationRequestID) { _ in
+            .onChange(of: coordinator.activationRequestID) {
                 handleActivationRequestIfNeeded()
             }
     }

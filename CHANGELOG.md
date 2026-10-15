@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Added
+- A once-per-content-revision **What's New** window introduces Tiny Clips Studio with a screen-and-camera illustration, editing highlights, and a saved preview toggle. Existing users see it once; new installations keep the onboarding tour instead. Enabling Studio leaves ordinary video recording unchanged.
+- The macOS screenshot editor Text tool now includes Plain, Light, Dark, and Accent text-box styles plus custom background, border, padding, and corner controls. Styles apply to the selected text or the next text annotation and reset with each editor window. (#435)
+- macOS adds an optional global **Screenshot Screen** shortcut that skips the capture picker and captures the selected screen. It is unassigned by default and can be configured in Settings > Shortcuts. (#440)
+- The macOS screenshot editor can now switch between **Fit** and **Actual Size (1:1)**, and remembers the selected mode for the next editor. (#436)
+- macOS users can now choose between a quick bug report and feature request from the in-app feedback form. Both prefill the matching GitHub template with app and OS details.
 - **Tiny Clips Studio (early preview, off by default).** Studio records the screen and the camera as separate layers and opens an editor when the recording ends. Pick a background and padding, round the screen card, choose a camera shape and one of four layouts (screen only, camera bubble, side by side, camera only), drag the bubble where you want it, trim the start and end, and export an MP4. The project stays editable afterward: reopen it from **Open in Studio…** in the Clips Manager, from Recent Captures, or from the drafts list in Settings › Studio. Studio has a Settings page of its own, which also sets how long projects are kept and how much disk space they may use.
   - To try it, switch on **Tiny Clips Studio (Preview)** in Settings › Studio. Then choose **Studio Recording…** in the menu bar menu, under **Record Video…**, which stays an ordinary recording. Switching Studio off again hides it and deletes nothing.
   - Zoom in on part of the screen for a stretch of the video. Press **Z** to add a zoom at the playhead, drag it on the timeline, and set how far it zooms and where it looks, or have it follow the pointer. **Suggest Zooms** proposes zooms from your clicks. The Screen and Camera panels each have a Crop group.
@@ -22,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - macOS General settings have a new **Confirm before closing editors with Esc** option, on by default, covering the screenshot editor, video trimmer, and GIF trimmer. Turn it off to close them with a single Esc press, which discards anything unsaved.
 
 ### Changed
+- The macOS **Screenshot Region**, **Screenshot Screen**, and **Screenshot Window** shortcuts now use the same icons in Settings as in the capture picker.
 - Pressing Esc in the macOS screenshot editor now asks before closing it, and warns when closing would discard a capture that has not been saved yet.
 - Pressing Esc in the macOS video and GIF trimmers now asks before closing them too, and warns when closing would discard a recording that has not been saved yet or trim changes that have not been exported.
 - macOS screenshot editor cropping is easier to find and control. The toolbar now has a labeled **Apply Crop** button, and choosing the Crop tool shows a Crop section in the sidebar with the selection size in pixels plus Apply Crop and Clear buttons.
@@ -32,6 +38,10 @@ All notable changes to this project will be documented in this file.
 - A crop selection in the macOS screenshot editor now only changes the image once it is applied, matching Windows. Save, Copy, and the output size ignore an unapplied selection, and switching tools clears it.
 
 ### Fixed
+- Fixed Swift 6 concurrency warnings in the macOS capture, save, and video overlay paths, including weak-capture issues and `AVVideoCompositing` protocol compatibility.
+- Resolved macOS build warnings for thumbnail generation, recording callbacks, audio mixdown, video overlays, StoreKit, and settings.
+- Fixed macOS video recordings made with both system audio and the microphone being saved with two audio tracks, which players that play only the first one (browsers, VLC, Windows players) played without the voice. Saved videos now have one audio track with both sounds in it, and the video trimmer no longer drops the microphone when it exports such a recording.
+- Fixed the macOS video trimmer doing nothing when an export failed. It now says what went wrong, and the original recording is kept.
 - Fixed Esc doing nothing in the macOS screenshot editor unless one of its controls had keyboard focus. Esc now closes the editor it is pressed in without quitting Tiny Clips.
 - Fixed Esc closing the macOS screenshot editor while typing in one of its text fields, such as the custom emoji field. Esc now leaves the field, and a second press closes the editor.
 - Fixed Command-W doing nothing in macOS Tiny Clips windows because the File menu had no Close item. Close is back in the File menu, and in the screenshot editor it still asks before discarding unsaved changes.

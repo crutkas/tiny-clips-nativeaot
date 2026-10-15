@@ -313,7 +313,6 @@ internal static class RecorderChecks
             throw new CheckSkippedException("this PC has no HEVC encoder");
         }
 
-
         const int width = 1920;
         const int height = 1080;
         const int fps = 30;

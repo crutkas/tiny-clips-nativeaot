@@ -26,6 +26,7 @@
 		B10000000000000000000011 /* CountdownWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* CountdownWindow.swift */; };
 		B10000000000000000000012 /* OnboardingWizardWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* OnboardingWizardWindow.swift */; };
 		B10000000000000000000013 /* GuideWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* GuideWindow.swift */; };
+		F47E9201113B4A0693F54DD1 /* WhatsNewWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47E9201113B4A0693F54DD0 /* WhatsNewWindow.swift */; };
 		B10000000000000000000014 /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* HotKeyManager.swift */; };
 		B10000000000000000000015 /* ScreenPickerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* ScreenPickerWindow.swift */; };
 		B10000000000000000000016 /* RegionIndicatorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* RegionIndicatorPanel.swift */; };
@@ -39,6 +40,7 @@
 		B1000000000000000000001E /* HotKeyBinding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* HotKeyBinding.swift */; };
 		B1000000000000000000001F /* ShortcutRecorderField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* ShortcutRecorderField.swift */; };
 		B10000000000000000000020 /* MouseClickOverlayProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* MouseClickOverlayProcessor.swift */; };
+		B10000000000000000000433 /* RecordingAudioMixdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000433 /* RecordingAudioMixdown.swift */; };
 		B1000000000000000000002E /* BrandingOverlayProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000031 /* BrandingOverlayProcessor.swift */; };
 		B10000000000000000000032 /* CaptureAnalyticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000032 /* CaptureAnalyticsStore.swift */; };
 		B10000000000000000000033 /* AnalyticsSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000033 /* AnalyticsSettingsSection.swift */; };
@@ -71,6 +73,7 @@
 		B20000000000000000000011 /* CountdownWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* CountdownWindow.swift */; };
 		B20000000000000000000012 /* OnboardingWizardWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* OnboardingWizardWindow.swift */; };
 		B20000000000000000000013 /* GuideWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* GuideWindow.swift */; };
+		F47E9201113B4A0693F54DD2 /* WhatsNewWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47E9201113B4A0693F54DD0 /* WhatsNewWindow.swift */; };
 		B20000000000000000000014 /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* HotKeyManager.swift */; };
 		B20000000000000000000015 /* ScreenPickerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* ScreenPickerWindow.swift */; };
 		B20000000000000000000016 /* RegionIndicatorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* RegionIndicatorPanel.swift */; };
@@ -84,6 +87,7 @@
 		B2000000000000000000001E /* HotKeyBinding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* HotKeyBinding.swift */; };
 		B2000000000000000000001F /* ShortcutRecorderField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* ShortcutRecorderField.swift */; };
 		B20000000000000000000020 /* MouseClickOverlayProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* MouseClickOverlayProcessor.swift */; };
+		B20000000000000000000433 /* RecordingAudioMixdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000433 /* RecordingAudioMixdown.swift */; };
 		B2000000000000000000002E /* BrandingOverlayProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000031 /* BrandingOverlayProcessor.swift */; };
 		B20000000000000000000032 /* CaptureAnalyticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000032 /* CaptureAnalyticsStore.swift */; };
 		B20000000000000000000033 /* AnalyticsSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000033 /* AnalyticsSettingsSection.swift */; };
@@ -129,10 +133,12 @@
 		B4EB92CF2F3FCA0B002723CD /* libwebp in Frameworks */ = {isa = PBXBuildFile; productRef = B4EB92CE2F3FCA0B002723CD /* libwebp */; };
 		B4EB92CF2F3FCA0B002723CE /* libwebp in Frameworks */ = {isa = PBXBuildFile; productRef = B4EB92CE2F3FCA0B002723CD /* libwebp */; };
 		B30000000000000000000001 /* CaptureMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000001 /* CaptureMathTests.swift */; };
+		B30000000000000000000433 /* RecordingAudioMixdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000433 /* RecordingAudioMixdownTests.swift */; };
 		B30000000000000000000002 /* HotKeyBindingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* HotKeyBindingTests.swift */; };
 		B30000000000000000000003 /* CaptureSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000003 /* CaptureSettingsTests.swift */; };
 		B30000000000000000000004 /* SaveServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000004 /* SaveServiceTests.swift */; };
 		B30000000000000000000005 /* CaptureAnalyticsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000005 /* CaptureAnalyticsStoreTests.swift */; };
+		B30000000000000000000006 /* QuickFeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000007 /* QuickFeedbackTests.swift */; };
 		B40000000000000000000001 /* StudioJSON.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000001 /* StudioJSON.swift */; };
 		B40000000000000000000002 /* StudioProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000002 /* StudioProject.swift */; };
 		B40000000000000000000003 /* StudioEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000003 /* StudioEvents.swift */; };
@@ -236,6 +242,7 @@
 		A10000000000000000000014 /* CountdownWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownWindow.swift; sourceTree = "<group>"; };
 		A10000000000000000000015 /* OnboardingWizardWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWizardWindow.swift; sourceTree = "<group>"; };
 		A10000000000000000000016 /* GuideWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideWindow.swift; sourceTree = "<group>"; };
+		F47E9201113B4A0693F54DD0 /* WhatsNewWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewWindow.swift; sourceTree = "<group>"; };
 		A10000000000000000000017 /* HotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyManager.swift; sourceTree = "<group>"; };
 		A10000000000000000000018 /* ScreenPickerWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenPickerWindow.swift; sourceTree = "<group>"; };
 		A10000000000000000000019 /* RegionIndicatorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionIndicatorPanel.swift; sourceTree = "<group>"; };
@@ -249,6 +256,7 @@
 		A10000000000000000000021 /* HotKeyBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyBinding.swift; sourceTree = "<group>"; };
 		A10000000000000000000022 /* ShortcutRecorderField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderField.swift; sourceTree = "<group>"; };
 		A10000000000000000000023 /* MouseClickOverlayProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseClickOverlayProcessor.swift; sourceTree = "<group>"; };
+		A10000000000000000000433 /* RecordingAudioMixdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioMixdown.swift; sourceTree = "<group>"; };
 		A10000000000000000000031 /* BrandingOverlayProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandingOverlayProcessor.swift; sourceTree = "<group>"; };
 		A10000000000000000000032 /* CaptureAnalyticsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAnalyticsStore.swift; sourceTree = "<group>"; };
 		A10000000000000000000033 /* AnalyticsSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsSettingsSection.swift; sourceTree = "<group>"; };
@@ -285,11 +293,13 @@
 		A2000000000000000000000D /* TinyClipsMAS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TinyClipsMAS.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000000E /* TinyClipsMAS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinyClipsMAS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000001 /* CaptureMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureMathTests.swift; sourceTree = "<group>"; };
+		A30000000000000000000433 /* RecordingAudioMixdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioMixdownTests.swift; sourceTree = "<group>"; };
 		A30000000000000000000002 /* HotKeyBindingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyBindingTests.swift; sourceTree = "<group>"; };
 		A30000000000000000000003 /* CaptureSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSettingsTests.swift; sourceTree = "<group>"; };
 		A30000000000000000000004 /* SaveServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveServiceTests.swift; sourceTree = "<group>"; };
 		A30000000000000000000005 /* CaptureAnalyticsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAnalyticsStoreTests.swift; sourceTree = "<group>"; };
 		A30000000000000000000006 /* TinyClipsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TinyClipsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30000000000000000000007 /* QuickFeedbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickFeedbackTests.swift; sourceTree = "<group>"; };
 		A50000000000000000000001 /* StudioProjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioProjectTests.swift; sourceTree = "<group>"; };
 		A50000000000000000000002 /* StudioLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLayoutTests.swift; sourceTree = "<group>"; };
 		A500000000000000000000F1 /* StudioInspectorPanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioInspectorPanelTests.swift; sourceTree = "<group>"; };
@@ -402,6 +412,7 @@
 				A10000000000000000000014 /* CountdownWindow.swift */,
 				A10000000000000000000015 /* OnboardingWizardWindow.swift */,
 				A10000000000000000000016 /* GuideWindow.swift */,
+				F47E9201113B4A0693F54DD0 /* WhatsNewWindow.swift */,
 				A10000000000000000000018 /* ScreenPickerWindow.swift */,
 				A10000000000000000000019 /* RegionIndicatorPanel.swift */,
 				A1000000000000000000003C /* TeleprompterPanel.swift */,
@@ -445,6 +456,7 @@
 				A10000000000000000000007 /* VideoRecorder.swift */,
 				A10000000000000000000008 /* GifWriter.swift */,
 				A10000000000000000000023 /* MouseClickOverlayProcessor.swift */,
+				A10000000000000000000433 /* RecordingAudioMixdown.swift */,
 				A10000000000000000000031 /* BrandingOverlayProcessor.swift */,
 				A1000000000000000000001E /* WindowSelector.swift */,
 				A1000000000000000000003E /* ScrollingPanoramaCapture.swift */,
@@ -506,10 +518,12 @@
 			isa = PBXGroup;
 			children = (
 				A30000000000000000000001 /* CaptureMathTests.swift */,
+				A30000000000000000000433 /* RecordingAudioMixdownTests.swift */,
 				A30000000000000000000002 /* HotKeyBindingTests.swift */,
 				A30000000000000000000003 /* CaptureSettingsTests.swift */,
 				A30000000000000000000004 /* SaveServiceTests.swift */,
 				A30000000000000000000005 /* CaptureAnalyticsStoreTests.swift */,
+				A30000000000000000000007 /* QuickFeedbackTests.swift */,
 				A50000000000000000000001 /* StudioProjectTests.swift */,
 				A50000000000000000000002 /* StudioLayoutTests.swift */,
 				A500000000000000000000F1 /* StudioInspectorPanelTests.swift */,
@@ -704,6 +718,7 @@
 				B10000000000000000000011 /* CountdownWindow.swift in Sources */,
 				B10000000000000000000012 /* OnboardingWizardWindow.swift in Sources */,
 				B10000000000000000000013 /* GuideWindow.swift in Sources */,
+				F47E9201113B4A0693F54DD1 /* WhatsNewWindow.swift in Sources */,
 				B10000000000000000000014 /* HotKeyManager.swift in Sources */,
 				B10000000000000000000015 /* ScreenPickerWindow.swift in Sources */,
 				B10000000000000000000016 /* RegionIndicatorPanel.swift in Sources */,
@@ -717,6 +732,7 @@
 				B1000000000000000000001E /* HotKeyBinding.swift in Sources */,
 				B1000000000000000000001F /* ShortcutRecorderField.swift in Sources */,
 				B10000000000000000000020 /* MouseClickOverlayProcessor.swift in Sources */,
+				B10000000000000000000433 /* RecordingAudioMixdown.swift in Sources */,
 				B1000000000000000000002E /* BrandingOverlayProcessor.swift in Sources */,
 				B10000000000000000000032 /* CaptureAnalyticsStore.swift in Sources */,
 				B10000000000000000000021 /* CaptureManager.swift in Sources */,
@@ -797,6 +813,7 @@
 				B20000000000000000000011 /* CountdownWindow.swift in Sources */,
 				B20000000000000000000012 /* OnboardingWizardWindow.swift in Sources */,
 				B20000000000000000000013 /* GuideWindow.swift in Sources */,
+				F47E9201113B4A0693F54DD2 /* WhatsNewWindow.swift in Sources */,
 				B20000000000000000000014 /* HotKeyManager.swift in Sources */,
 				B20000000000000000000015 /* ScreenPickerWindow.swift in Sources */,
 				B20000000000000000000016 /* RegionIndicatorPanel.swift in Sources */,
@@ -810,6 +827,7 @@
 				B2000000000000000000001E /* HotKeyBinding.swift in Sources */,
 				B2000000000000000000001F /* ShortcutRecorderField.swift in Sources */,
 				B20000000000000000000020 /* MouseClickOverlayProcessor.swift in Sources */,
+				B20000000000000000000433 /* RecordingAudioMixdown.swift in Sources */,
 				B2000000000000000000002E /* BrandingOverlayProcessor.swift in Sources */,
 				B20000000000000000000032 /* CaptureAnalyticsStore.swift in Sources */,
 				B20000000000000000000021 /* CaptureManager.swift in Sources */,
@@ -865,10 +883,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				B30000000000000000000001 /* CaptureMathTests.swift in Sources */,
+				B30000000000000000000433 /* RecordingAudioMixdownTests.swift in Sources */,
 				B30000000000000000000002 /* HotKeyBindingTests.swift in Sources */,
 				B30000000000000000000003 /* CaptureSettingsTests.swift in Sources */,
 				B30000000000000000000004 /* SaveServiceTests.swift in Sources */,
 				B30000000000000000000005 /* CaptureAnalyticsStoreTests.swift in Sources */,
+				B30000000000000000000006 /* QuickFeedbackTests.swift in Sources */,
 				B60000000000000000000001 /* StudioProjectTests.swift in Sources */,
 				B60000000000000000000002 /* StudioLayoutTests.swift in Sources */,
 				B600000000000000000000F1 /* StudioInspectorPanelTests.swift in Sources */,

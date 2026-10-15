@@ -800,8 +800,8 @@ public partial class App : Application
             Dismiss));
         footerActions.Children.Add(CreateFooterButton(
             GlyphBug,
-            "File a Bug",
-            "TrayFileBugButton",
+            "Send Feedback",
+            "TrayFeedbackButton",
             new RelayCommand(OpenQuickBugReportWindow),
             Dismiss));
 		footerActions.Children.Add(CreateFooterButton(
@@ -1165,6 +1165,8 @@ public partial class App : Application
 
     private Task CaptureScreenshotWindowAsync() => BeginCaptureAsync(CaptureType.Screenshot, CapturePickerMode.Window);
 
+    private Task CaptureScreenshotScreenAsync() => BeginCaptureAsync(CaptureType.Screenshot, CapturePickerMode.Screen);
+
     private Task RecognizeTextAsync() => BeginCaptureAsync(CaptureType.Screenshot, CapturePickerMode.RecognizeText);
 
     /// <summary>
@@ -1249,7 +1251,8 @@ public partial class App : Application
                 : new EarlyBackdrop(earlyBackdropMonitors!, earlyBackdrops, earlyBackdropStarted);
             var resolved = await ResolveTargetAsync(
                 isTextRecognition || isScrolling ? CapturePickerMode.Region : pick.Mode,
-                earlyBackdrop);
+                earlyBackdrop,
+                captureFlowCts.Token);
             CaptureFlowTrace.Mark($"target: {(resolved is null ? "cancelled" : "resolved")}");
             if (resolved is not { } selection)
             {
@@ -1940,7 +1943,10 @@ public partial class App : Application
         settings.WebcamCornerRadius = setup.WebcamCornerRadius;
     }
 
-    private async Task<TargetSelection?> ResolveTargetAsync(CapturePickerMode mode, EarlyBackdrop? earlyBackdrop = null)
+    private async Task<TargetSelection?> ResolveTargetAsync(
+        CapturePickerMode mode,
+        EarlyBackdrop? earlyBackdrop = null,
+        CancellationToken cancellationToken = default)
     {
         var monitors = Services.GetRequiredService<IMonitorService>();
         var settings = Services.GetRequiredService<ICaptureSettings>();
@@ -1966,7 +1972,7 @@ public partial class App : Application
                     : null;
                 CaptureFlowTrace.Mark(backdrops is null ? "region: capturing fresh backdrop" : "region: reusing early backdrop");
 
-                var result = await RegionSelectController.RunAsync(overlayMonitors, backdrops);
+                var result = await RegionSelectController.RunAsync(overlayMonitors, backdrops, cancellationToken);
                 if (result is not { } selection)
                 {
                     return null;
@@ -3503,6 +3509,7 @@ public partial class App : Application
         {
             return GlobalHotKeyRegistrationResult.Failed(
                 new GlobalHotKeyRegistrationFailure(
+                    null,
                     "TinyClips hotkey service",
                     0,
                     "The UI dispatcher is not available."));
@@ -3518,6 +3525,7 @@ public partial class App : Application
 
             var screenshot = hotKeys.GetBinding(HotKeyAction.Screenshot);
             manager.Add(
+                HotKeyAction.Screenshot,
                 $"Screenshot ({screenshot.DisplayString})",
                 screenshot.ModifiersValue,
                 screenshot.VirtualKey,
@@ -3527,6 +3535,7 @@ public partial class App : Application
             if (!screenshotRegion.IsUnbound)
             {
                 manager.Add(
+                    HotKeyAction.ScreenshotRegion,
                     $"Screenshot region ({screenshotRegion.DisplayString})",
                     screenshotRegion.ModifiersValue,
                     screenshotRegion.VirtualKey,
@@ -3537,14 +3546,27 @@ public partial class App : Application
             if (!screenshotWindow.IsUnbound)
             {
                 manager.Add(
+                    HotKeyAction.ScreenshotWindow,
                     $"Screenshot window ({screenshotWindow.DisplayString})",
                     screenshotWindow.ModifiersValue,
                     screenshotWindow.VirtualKey,
                     () => _ = CaptureScreenshotWindowAsync());
             }
 
+            var screenshotScreen = hotKeys.GetBinding(HotKeyAction.ScreenshotScreen);
+            if (!screenshotScreen.IsUnbound)
+            {
+                manager.Add(
+                    HotKeyAction.ScreenshotScreen,
+                    $"Screenshot screen ({screenshotScreen.DisplayString})",
+                    screenshotScreen.ModifiersValue,
+                    screenshotScreen.VirtualKey,
+                    () => _ = CaptureScreenshotScreenAsync());
+            }
+
             var videoBinding = hotKeys.GetBinding(HotKeyAction.RecordVideo);
             manager.Add(
+                HotKeyAction.RecordVideo,
                 $"Record video ({videoBinding.DisplayString})",
                 videoBinding.ModifiersValue,
                 videoBinding.VirtualKey,
@@ -3552,6 +3574,7 @@ public partial class App : Application
 
             var gifBinding = hotKeys.GetBinding(HotKeyAction.RecordGif);
             manager.Add(
+                HotKeyAction.RecordGif,
                 $"Record GIF ({gifBinding.DisplayString})",
                 gifBinding.ModifiersValue,
                 gifBinding.VirtualKey,
@@ -3559,6 +3582,7 @@ public partial class App : Application
 
             var ocrBinding = hotKeys.GetBinding(HotKeyAction.RecognizeText);
             manager.Add(
+                HotKeyAction.RecognizeText,
                 $"Recognize text ({ocrBinding.DisplayString})",
                 ocrBinding.ModifiersValue,
                 ocrBinding.VirtualKey,
@@ -3566,6 +3590,7 @@ public partial class App : Application
 
             var stopBinding = hotKeys.GetStopBinding();
             manager.Add(
+                HotKeyAction.StopRecording,
                 $"Stop recording ({stopBinding.DisplayString})",
                 stopBinding.ModifiersValue,
                 stopBinding.VirtualKey,
@@ -3595,6 +3620,7 @@ public partial class App : Application
             Debug.WriteLine($"Global hotkey registration failed: {ex}");
             return GlobalHotKeyRegistrationResult.Failed(
                 new GlobalHotKeyRegistrationFailure(
+                    null,
                     "TinyClips hotkey service",
                     ex.HResult,
                     ex.Message));
@@ -3608,6 +3634,7 @@ public partial class App : Application
         {
             return GlobalHotKeyRegistrationResult.Failed(
                 new GlobalHotKeyRegistrationFailure(
+                    null,
                     "TinyClips hotkey service",
                     0,
                     "Hotkeys can only be updated from the TinyClips UI thread."));
@@ -3695,6 +3722,15 @@ public partial class App : Application
 
     private void OpenSettingsWindow() => OpenSettingsWindow(section: null);
 
+    internal void RefreshStudioPreviewSetting()
+    {
+        if (_settingsWindow is not null)
+        {
+            _settingsWindow.ViewModel.IsStudioPreviewEnabled =
+                Services.GetRequiredService<ICaptureSettings>().StudioPreviewEnabled;
+        }
+    }
+
     internal void OpenSettingsWindow(SettingsSectionKind? section)
     {
         if (_settingsWindow is null)
@@ -3761,7 +3797,8 @@ public partial class App : Application
         if (_quickBugReportWindow is null)
         {
             _quickBugReportWindow = new QuickBugReportWindow(
-                QuickBugReport.GetAppVersion(),
+                QuickBugReport.GetAppFeedbackVersion(),
+                QuickBugReport.GetAppBuild(),
                 QuickBugReport.GetDistributionChannel());
             _quickBugReportWindow.Closed += (_, _) => _quickBugReportWindow = null;
         }
@@ -3861,6 +3898,7 @@ public partial class App : Application
         }
 
         _isExiting = true;
+        CancelCaptureFlow();
         try
         {
             Services.GetRequiredService<IScrollingCaptureService>().Cancel();
