@@ -1658,7 +1658,7 @@ internal sealed class EditorController : IDisposable
             }
             else if (state.IncludeBackground && state.BackgroundStyle == ExportBackgroundStyle.Gradient)
             {
-                var endpoints = ScreenshotGradientMath.Endpoints(state.GradientDirectionDegrees);
+                var endpoints = ScreenshotGradientMath.Endpoints(state.GradientDirectionDegrees, outW, outH);
                 using var brush = new CanvasLinearGradientBrush(device, state.BackgroundColor, state.BackgroundColor2)
                 {
                     StartPoint = new Vector2((float)(endpoints.Start.X * outW), (float)(endpoints.Start.Y * outH)),

@@ -1834,7 +1834,11 @@ class ScreenshotEditorViewModel: ObservableObject {
                 let colors = [NSColor(backgroundColor).cgColor, NSColor(backgroundSecondaryColor).cgColor] as CFArray
                 let colorSpace = CGColorSpaceCreateDeviceRGB()
                 if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0, 1]) {
-                    let endpoints = ScreenshotGradientMath.endpoints(degrees: gradientDirectionDegrees)
+                    let endpoints = ScreenshotGradientMath.endpoints(
+                        degrees: gradientDirectionDegrees,
+                        width: Double(outputW),
+                        height: Double(outputH)
+                    )
                     let start = CGPoint(
                         x: endpoints.start.x * CGFloat(outputW),
                         y: (1 - endpoints.start.y) * CGFloat(outputH)
@@ -1843,7 +1847,12 @@ class ScreenshotEditorViewModel: ObservableObject {
                         x: endpoints.end.x * CGFloat(outputW),
                         y: (1 - endpoints.end.y) * CGFloat(outputH)
                     )
-                    context.drawLinearGradient(gradient, start: start, end: end, options: [])
+                    context.drawLinearGradient(
+                        gradient,
+                        start: start,
+                        end: end,
+                        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+                    )
                 }
             } else if backgroundStyle == .wallpaper,
                       let wallpaperImage,

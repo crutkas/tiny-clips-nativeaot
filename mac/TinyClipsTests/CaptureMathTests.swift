@@ -15,11 +15,34 @@ final class CaptureMathTests: XCTestCase {
         ]
 
         for (degrees, expectedStart, expectedEnd) in cases {
-            let endpoints = ScreenshotGradientMath.endpoints(degrees: degrees)
+            let endpoints = ScreenshotGradientMath.endpoints(degrees: degrees, width: 100, height: 100)
             XCTAssertEqual(endpoints.start.x, expectedStart.x, accuracy: 0.0001)
             XCTAssertEqual(endpoints.start.y, expectedStart.y, accuracy: 0.0001)
             XCTAssertEqual(endpoints.end.x, expectedEnd.x, accuracy: 0.0001)
             XCTAssertEqual(endpoints.end.y, expectedEnd.y, accuracy: 0.0001)
+        }
+    }
+
+    func testScreenshotGradientMathPreservesAngleOnNonSquareFrames() {
+        let width = 1600.0
+        let height = 900.0
+
+        for degrees in [30.0, 45.0, 135.0, 300.0] {
+            let endpoints = ScreenshotGradientMath.endpoints(degrees: degrees, width: width, height: height)
+            let startX = Double(endpoints.start.x) * width
+            let startY = Double(endpoints.start.y) * height
+            let dx = Double(endpoints.end.x) * width - startX
+            let dy = Double(endpoints.end.y) * height - startY
+            var rendered = atan2(dy, dx) * 180 / .pi
+            if rendered < 0 { rendered += 360 }
+            XCTAssertEqual(rendered, degrees, accuracy: 0.0001)
+
+            let lengthSquared = dx * dx + dy * dy
+            for (x, y) in [(0.0, 0.0), (width, 0.0), (0.0, height), (width, height)] {
+                let t = ((x - startX) * dx + (y - startY) * dy) / lengthSquared
+                XCTAssertGreaterThanOrEqual(t, -0.0001)
+                XCTAssertLessThanOrEqual(t, 1.0001)
+            }
         }
     }
 

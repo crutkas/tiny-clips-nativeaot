@@ -18,7 +18,7 @@ public sealed class ScreenshotExportTests
     public void GradientMath_CalculatesDirectionEndpoints(
         double degrees, double startX, double startY, double endX, double endY)
     {
-        var endpoints = ScreenshotGradientMath.Endpoints(degrees);
+        var endpoints = ScreenshotGradientMath.Endpoints(degrees, 100, 100);
 
         Assert.Equal(startX, endpoints.Start.X, 10);
         Assert.Equal(startY, endpoints.Start.Y, 10);
@@ -26,9 +26,42 @@ public sealed class ScreenshotExportTests
         Assert.Equal(endY, endpoints.End.Y, 10);
     }
 
+    [Theory]
+    [InlineData(30)]
+    [InlineData(45)]
+    [InlineData(135)]
+    [InlineData(300)]
+    public void GradientMath_PreservesAngleAndCoversCornersOnNonSquareFrames(double degrees)
+    {
+        const double width = 1600;
+        const double height = 900;
+        var endpoints = ScreenshotGradientMath.Endpoints(degrees, width, height);
+        var startX = endpoints.Start.X * width;
+        var startY = endpoints.Start.Y * height;
+        var dx = endpoints.End.X * width - startX;
+        var dy = endpoints.End.Y * height - startY;
+        var rendered = Math.Atan2(dy, dx) * 180 / Math.PI;
+        if (rendered < 0) rendered += 360;
+
+        Assert.Equal(degrees, rendered, 8);
+        var lengthSquared = dx * dx + dy * dy;
+        foreach (var (x, y) in new[] { (0d, 0d), (width, 0d), (0d, height), (width, height) })
+        {
+            var t = ((x - startX) * dx + (y - startY) * dy) / lengthSquared;
+            Assert.InRange(t, -1e-9, 1 + 1e-9);
+        }
+    }
+
     [Fact]
     public void GradientMath_RejectsNonFiniteDirection() =>
-        Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotGradientMath.Endpoints(double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotGradientMath.Endpoints(double.NaN, 100, 100));
+
+    [Theory]
+    [InlineData(0, 100)]
+    [InlineData(100, 0)]
+    [InlineData(double.NaN, 100)]
+    public void GradientMath_RejectsInvalidFrameSize(double width, double height) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotGradientMath.Endpoints(45, width, height));
 
     [Theory]
     [InlineData(1920, 1080, 100, 1920, 1080)]
