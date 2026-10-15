@@ -484,7 +484,7 @@ public sealed partial class EditorCanvas : UserControl
             Canvas.SetTop(CanvasBackground, frameOffY);
             CanvasBackground.Width = frame.FrameSize.Width * scale;
             CanvasBackground.Height = frame.FrameSize.Height * scale;
-            CanvasBackground.Background = MakeBackgroundBrush();
+            CanvasBackground.Background = MakeBackgroundBrush(frame.FrameSize);
         }
 
         Canvas.SetLeft(ImageCard, imageOffX);
@@ -498,11 +498,17 @@ public sealed partial class EditorCanvas : UserControl
         ImageCard.Translation = new Vector3(0, 0, (float)(_controller.CanvasShadow > 0 ? Math.Max(8, _controller.CanvasShadow) : 0));
     }
 
-    private Brush MakeBackgroundBrush()
+    private Brush MakeBackgroundBrush(Size frameSize)
     {
         if (_controller.BgStyle == ExportBackgroundStyle.Gradient)
         {
-            var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+            var endpoints = ScreenshotGradientMath.Endpoints(
+                _controller.GradientDirectionDegrees, frameSize.Width, frameSize.Height);
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Point(endpoints.Start.X, endpoints.Start.Y),
+                EndPoint = new Point(endpoints.End.X, endpoints.End.Y),
+            };
             brush.GradientStops.Add(new GradientStop { Color = _controller.BgColor, Offset = 0 });
             brush.GradientStops.Add(new GradientStop { Color = _controller.BgColor2, Offset = 1 });
             return brush;

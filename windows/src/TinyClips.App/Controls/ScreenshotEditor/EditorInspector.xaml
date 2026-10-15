@@ -387,6 +387,17 @@
                             AutomationProperties.Name="Gradient background presets"
                             SelectionMode="None" />
 
+                        <Slider
+                            x:Name="GradientDirectionSlider"
+                            AutomationProperties.AutomationId="EditorGradientDirectionSlider"
+                            AutomationProperties.Name="Gradient direction"
+                            Header="Gradient direction"
+                            Maximum="360"
+                            Minimum="0"
+                            StepFrequency="1"
+                            ToolTipService.ToolTip="Direction from the first color to the second. 0° is left to right; 90° is top to bottom."
+                            ValueChanged="OnGradientDirectionChanged" />
+
                         <StackPanel x:Name="CustomColorPanel" Spacing="8">
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"

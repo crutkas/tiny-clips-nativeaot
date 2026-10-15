@@ -1271,6 +1271,16 @@ struct ScreenshotEditorView: View {
 
                 if viewModel.backgroundStyle == .gradient {
                     SwatchColorPicker(label: "Color 2", color: $viewModel.backgroundSecondaryColor, supportsOpacity: true)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Direction: \(Int(viewModel.gradientDirectionDegrees))°")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Slider(value: $viewModel.gradientDirectionDegrees, in: 0...360, step: 1)
+                            .accessibilityLabel("Gradient direction")
+                            .accessibilityValue("\(Int(viewModel.gradientDirectionDegrees)) degrees")
+                            .accessibilityHint("Direction from the first color to the second. 0 degrees is left to right; 90 degrees is top to bottom.")
+                    }
                 }
 
                 HStack(spacing: 8) {

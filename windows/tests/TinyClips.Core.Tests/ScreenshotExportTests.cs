@@ -9,6 +9,61 @@ namespace TinyClips.Core.Tests;
 public sealed class ScreenshotExportTests
 {
     [Theory]
+    [InlineData(0, 0, 0.5, 1, 0.5)]
+    [InlineData(45, 0, 0, 1, 1)]
+    [InlineData(90, 0.5, 0, 0.5, 1)]
+    [InlineData(180, 1, 0.5, 0, 0.5)]
+    [InlineData(270, 0.5, 1, 0.5, 0)]
+    [InlineData(360, 0, 0.5, 1, 0.5)]
+    public void GradientMath_CalculatesDirectionEndpoints(
+        double degrees, double startX, double startY, double endX, double endY)
+    {
+        var endpoints = ScreenshotGradientMath.Endpoints(degrees, 100, 100);
+
+        Assert.Equal(startX, endpoints.Start.X, 10);
+        Assert.Equal(startY, endpoints.Start.Y, 10);
+        Assert.Equal(endX, endpoints.End.X, 10);
+        Assert.Equal(endY, endpoints.End.Y, 10);
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(45)]
+    [InlineData(135)]
+    [InlineData(300)]
+    public void GradientMath_PreservesAngleAndCoversCornersOnNonSquareFrames(double degrees)
+    {
+        const double width = 1600;
+        const double height = 900;
+        var endpoints = ScreenshotGradientMath.Endpoints(degrees, width, height);
+        var startX = endpoints.Start.X * width;
+        var startY = endpoints.Start.Y * height;
+        var dx = endpoints.End.X * width - startX;
+        var dy = endpoints.End.Y * height - startY;
+        var rendered = Math.Atan2(dy, dx) * 180 / Math.PI;
+        if (rendered < 0) rendered += 360;
+
+        Assert.Equal(degrees, rendered, 8);
+        var lengthSquared = dx * dx + dy * dy;
+        foreach (var (x, y) in new[] { (0d, 0d), (width, 0d), (0d, height), (width, height) })
+        {
+            var t = ((x - startX) * dx + (y - startY) * dy) / lengthSquared;
+            Assert.InRange(t, -1e-9, 1 + 1e-9);
+        }
+    }
+
+    [Fact]
+    public void GradientMath_RejectsNonFiniteDirection() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotGradientMath.Endpoints(double.NaN, 100, 100));
+
+    [Theory]
+    [InlineData(0, 100)]
+    [InlineData(100, 0)]
+    [InlineData(double.NaN, 100)]
+    public void GradientMath_RejectsInvalidFrameSize(double width, double height) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => ScreenshotGradientMath.Endpoints(45, width, height));
+
+    [Theory]
     [InlineData(1920, 1080, 100, 1920, 1080)]
     [InlineData(1920, 1080, 50, 960, 540)]
     [InlineData(101, 99, 50, 50, 50)]
@@ -171,7 +226,7 @@ public sealed class ScreenshotExportTests
             ExportHorizontalAlignment.Left, ExportVerticalAlignment.Bottom);
         var state = new ScreenshotRenderState(annotations.Select(a => a.CaptureSnapshot()).ToImmutableArray(),
             frame, ExportBackgroundStyle.Gradient, Color.FromArgb(255, 1, 2, 3),
-            Color.FromArgb(255, 4, 5, 6), 20, 16, true, ScreenshotExportSize.Create(frame.FrameSize, 50));
+            Color.FromArgb(255, 4, 5, 6), 123, 20, 16, true, ScreenshotExportSize.Create(frame.FrameSize, 50));
         annotations.Reverse();
         annotations.Clear();
 
@@ -179,6 +234,7 @@ public sealed class ScreenshotExportTests
         Assert.Equal(ExportBackgroundStyle.Gradient, state.BackgroundStyle);
         Assert.Equal(Color.FromArgb(255, 1, 2, 3), state.BackgroundColor);
         Assert.Equal(Color.FromArgb(255, 4, 5, 6), state.BackgroundColor2);
+        Assert.Equal(123, state.GradientDirectionDegrees);
         Assert.Equal(20, state.CornerRadius);
         Assert.Equal(16, state.Shadow);
         Assert.Equal(200, state.OutputSize.Width);

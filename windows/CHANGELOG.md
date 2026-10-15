@@ -5,6 +5,9 @@ own `CHANGELOG.md` at the repository root.
 
 ## [Unreleased]
 
+### Added
+- **Gradient direction** — choose any direction from 0° to 360° for screenshot-editor gradient backgrounds; the preview and exported image stay in sync. (#463)
+
 ### Changed
 - **Capture picker parity** — Text recognition remains available from the tray and a configurable global
   shortcut, but no longer appears as a duplicate option in the screenshot picker. (#452)
