@@ -6,8 +6,11 @@ own `CHANGELOG.md` at the repository root.
 ## [Unreleased]
 
 ### Changed
-- **Capture picker parity** — Text recognition remains available from the tray and its global
+- **Capture picker parity** — Text recognition remains available from the tray and a configurable global
   shortcut, but no longer appears as a duplicate option in the screenshot picker. (#452)
+- Only the **Screenshot**, **Record Video**, and **Record GIF** global shortcuts are assigned by
+  default. **Recognize Text (OCR)** now starts unbound, alongside the direct Screenshot region,
+  window, and screen shortcuts, and can be set in Settings → Keyboard shortcuts. (#451)
 
 ## [v1.8.3-windows] - 2026-10-12
 
