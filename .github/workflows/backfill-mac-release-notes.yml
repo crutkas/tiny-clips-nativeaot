@@ -1,0 +1,106 @@
+name: Backfill macOS release notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Optional macOS release tag; leave blank to repair all releases with matching changelog sections'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run: preview changes without updating releases'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backfill-mac-release-notes
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore changelog sections in published macOS releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+          import subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          requested_tag = os.environ["RELEASE_TAG"].strip()
+          dry_run = os.environ["DRY_RUN"] == "true"
+          tag_pattern = r"v[0-9]+(?:\.[0-9]+){2,3}(?:-mac)?"
+          if requested_tag and not re.fullmatch(tag_pattern, requested_tag):
+              raise SystemExit("Expected a macOS version tag, such as v1.8.3-mac or v1.4.0.3")
+
+          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          sections = {}
+          for section in re.split(r"(?m)^## ", changelog)[1:]:
+              heading, _, notes = section.partition("\n")
+              match = re.fullmatch(rf"({tag_pattern})(?:\s+-.*)?", heading)
+              if match and notes.strip():
+                  sections[match[1]] = notes.strip()
+
+          result = subprocess.run(
+              ["gh", "api", "--paginate", f"repos/{repo}/releases?per_page=100"],
+              check=True, capture_output=True, text=True,
+          )
+          # Pagination returns consecutive JSON arrays.
+          decoder = json.JSONDecoder()
+          remaining = result.stdout.strip()
+          releases = []
+          while remaining:
+              page, offset = decoder.raw_decode(remaining)
+              releases.extend(page)
+              remaining = remaining[offset:].lstrip()
+
+          matched = 0
+          for release in releases:
+              tag = release["tag_name"]
+              if release["draft"] or not re.fullmatch(tag_pattern, tag):
+                  continue
+              if requested_tag and tag != requested_tag:
+                  continue
+              notes = sections.get(tag) or sections.get(tag.removesuffix("-mac"))
+              if not notes:
+                  print(f"Skipping {tag}: no matching changelog section")
+                  continue
+              matched += 1
+              body = release.get("body") or ""
+              footer = re.search(
+                  r"(?m)^(?:## Install\s*$|\*\*(?:Full Changelog|Release Details)\*\*:)",
+                  body,
+              )
+              if not footer:
+                  raise SystemExit(f"Unrecognized release body for {tag}; refusing to overwrite it")
+              updated_body = notes + "\n\n" + body[footer.start():].strip() + "\n"
+              if updated_body.strip() == body.strip():
+                  print(f"Unchanged: {tag}")
+                  continue
+              notes_file = pathlib.Path(os.environ["RUNNER_TEMP"]) / f"{tag}-notes.md"
+              notes_file.write_text(updated_body, encoding="utf-8")
+              print(f"{'Would update' if dry_run else 'Updating'}: {tag}")
+              if dry_run:
+                  print(updated_body)
+              else:
+                  subprocess.run(
+                      ["gh", "release", "edit", tag, "--repo", repo, "--notes-file", str(notes_file)],
+                      check=True,
+                  )
+
+          if requested_tag and not matched:
+              raise SystemExit(f"No published release with matching changelog notes for {requested_tag}")
+          print(f"{'Previewed' if dry_run else 'Processed'} {matched} releases")
+          PY

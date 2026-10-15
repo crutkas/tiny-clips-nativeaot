@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - macOS Settings > Shortcuts now has a **Clear** button to unassign a shortcut without resetting it to its default. (#450)
+- macOS GitHub releases and Sparkle update notes now use the matching changelog section instead of falling back to commit messages. Older release descriptions can be repaired with the manual **Backfill macOS release notes** workflow, without rebuilding or replacing downloads; preview with **Dry run** before applying.
 
 ### Changed
 - Only the **Screenshot**, **Record Video**, and **Record GIF** global shortcuts are assigned by default on macOS. **Copy Text from Region**, **Screenshot Region**, **Screenshot Window**, and **Screenshot Screen** now start unassigned and can be set in Settings > Shortcuts. (#451)
