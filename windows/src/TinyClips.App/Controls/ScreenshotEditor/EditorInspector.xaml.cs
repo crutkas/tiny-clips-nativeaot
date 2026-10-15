@@ -25,10 +25,27 @@ public sealed partial class EditorInspector : UserControl
     private EditorController _controller = null!;
     private bool _inspectorInitializing = true;
     private bool _bgInitializing;
+    private ContentDialog? _backgroundColorDialog;
+    private IAsyncOperation<ContentDialogResult>? _backgroundColorDialogOperation;
 
     public EditorInspector()
     {
         InitializeComponent();
+    }
+
+    internal bool HasOpenBackgroundColorDialog => _backgroundColorDialog is not null;
+
+    internal async Task DismissBackgroundColorDialogAsync()
+    {
+        var dialog = _backgroundColorDialog;
+        var showOperation = _backgroundColorDialogOperation;
+        if (dialog is null || showOperation is null)
+        {
+            return;
+        }
+
+        dialog.Hide();
+        await showOperation;
     }
 
     internal void Attach(EditorController controller)
@@ -824,11 +841,25 @@ public sealed partial class EditorInspector : UserControl
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.XamlRoot,
-            RequestedTheme = this.RequestedTheme,
+            RequestedTheme = this.ActualTheme,
         };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(dialog, "EditorBackgroundColorDialog");
 
-        return await dialog.ShowAsync() == ContentDialogResult.Primary ? picker.Color : null;
+        _backgroundColorDialog = dialog;
+        try
+        {
+            var showOperation = dialog.ShowAsync();
+            _backgroundColorDialogOperation = showOperation;
+            return await showOperation == ContentDialogResult.Primary ? picker.Color : null;
+        }
+        finally
+        {
+            if (ReferenceEquals(_backgroundColorDialog, dialog))
+            {
+                _backgroundColorDialog = null;
+                _backgroundColorDialogOperation = null;
+            }
+        }
     }
 
     private void OnPaddingChanged(object sender, RangeBaseValueChangedEventArgs e)

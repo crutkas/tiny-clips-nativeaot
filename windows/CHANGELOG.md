@@ -23,6 +23,7 @@ own `CHANGELOG.md` at the repository root.
 ### Fixed
 - Screenshot-editor background preset captions now match the selected style, and custom color
   selection opens in a native WinUI picker dialog instead of being clipped inside the inspector.
+  The picker follows the editor's current theme and closes before any discard confirmation appears.
 
 ## [v1.8.3-windows] - 2026-10-12
 
