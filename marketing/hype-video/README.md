@@ -50,8 +50,8 @@ Everything is cut to a 128 BPM grid: one bar is 1.875 s and the piece is 24 bars
 | 4–7 | 0:07.5 | Actual Windows Studio controls/timeline with a privacy-safe, illustrative animated canvas |
 | 7–9 | 0:13.125 | Zoom, cut, speed, MP4 export, editable projects, and enabling Studio Preview |
 | 9–12 | 0:16.875 | A rendered Studio video recap and Preview call to action |
-| 12–14 | 0:22.5 | Screenshot editor: arrows, steps, redaction, stickers, text, backgrounds |
-| 14–17 | 0:26.25 | Screenshot, video, GIF; microphone and system audio; menu bar and tray |
+| 12–15 | 0:22.5 | Screenshot, video, GIF; microphone and system audio; menu bar and tray |
+| 15–17 | 0:28.125 | Screenshot editor: arrows, steps, redaction, stickers, text, backgrounds |
 | 17–21 | 0:31.875 | Six recent cross-platform features from `content.js` |
 | 21–24 | 0:39.4 | Tiny Clips · Available on macOS and Windows · tinyclips.app |
 
@@ -61,6 +61,8 @@ not presented as Studio. Scene transitions and background movement have been sof
 this cut, and a melodic lo-fi motif gives the soundtrack a clearer music lead. The second half
 highlights shipped cross-platform additions, rather than implying every tile first shipped in
 2.0. The established download outro is unchanged.
+The result preview puts its export controls along the top of the video and the Scene 01 layout
+label below them.
 
 ### Recorded Studio media
 

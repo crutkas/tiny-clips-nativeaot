@@ -808,11 +808,11 @@ kbd {
 .render-stamp b { margin-left: 12px; color: var(--cyan); }
 .render-pointer { position: absolute; z-index: 2; left: 31%; top: 40%; width: 26px; height: 26px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 0 #fff9; animation: render-cursor calc(var(--beat) * 8) var(--out) calc(var(--start) + var(--beat)) both; }
 @keyframes render-cursor { 0% { left: 31%; top: 40%; box-shadow: 0 0 0 0 #fff9; } 28% { left: 55%; top: 47%; box-shadow: 0 0 0 12px #fff0; } 38% { left: 56%; top: 48%; box-shadow: 0 0 0 0 #fff9; } 72% { left: 39%; top: 30%; box-shadow: 0 0 0 12px #fff0; } 82%, 100% { left: 39%; top: 30%; box-shadow: 0 0 0 0 #fff0; } }
-.render-scene-label { position: absolute; z-index: 2; left: 28px; top: 84px; display: grid; gap: 6px; color: #ffffffaa; font: 700 14px/1.2 var(--mono); letter-spacing: 0.12em; }
+.render-scene-label { position: absolute; z-index: 2; left: 28px; bottom: 40px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid #ffffff55; border-radius: 10px; background: #081322bb; color: #ffffffaa; font: 700 14px/1.2 var(--mono); letter-spacing: 0.12em; }
 .render-scene-label span { color: #fff; font: 700 21px/1.2 var(--font); letter-spacing: 0; }
-.render-features { position: absolute; z-index: 2; left: 28px; right: 28px; bottom: 68px; display: flex; justify-content: center; gap: 14px; }
+.render-features { position: absolute; z-index: 2; left: 250px; right: 28px; top: 24px; display: flex; justify-content: flex-end; gap: 14px; }
 .render-features span { padding: 9px 17px; border: 1px solid #ffffff55; border-radius: 999px; background: #081322aa; color: #fff; font-size: 19px; font-weight: 650; }
-.render-progress { position: absolute; z-index: 2; left: 28px; right: 28px; bottom: 30px; height: 4px; border-radius: 2px; background: #ffffff55; overflow: hidden; }
+.render-progress { position: absolute; z-index: 2; left: 28px; right: 28px; bottom: 18px; height: 4px; border-radius: 2px; background: #ffffff55; overflow: hidden; }
 .render-progress i { display: block; width: 100%; height: 100%; background: var(--cyan); transform: scaleX(0); transform-origin: left; animation: render-progress calc(var(--beat) * 8) linear calc(var(--start) + var(--beat)) both; }
 @keyframes render-progress { to { transform: scaleX(1); } }
 .render-end-card { position: absolute; z-index: 2; left: 50%; top: 50%; translate: -50% -50%; padding: 16px 28px; border: 1px solid #ffffff77; border-radius: 14px; background: #081322bb; color: #fff; font-size: 25px; font-weight: 700; opacity: 0; animation: render-endcard calc(var(--beat) * 8) ease calc(var(--start) + var(--beat)) both; }
