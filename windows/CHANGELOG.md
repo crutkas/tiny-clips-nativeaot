@@ -7,6 +7,7 @@ own `CHANGELOG.md` at the repository root.
 
 ### Added
 - **Gradient direction** — choose any direction from 0° to 360° for screenshot-editor gradient backgrounds; the preview and exported image stay in sync. (#463)
+- **Custom gradient colors** — choose independent custom colors for both ends of a screenshot-editor gradient.
 
 ### Changed
 - **Capture picker parity** — Text recognition remains available from the tray and a configurable global
@@ -14,6 +15,10 @@ own `CHANGELOG.md` at the repository root.
 - Only the **Screenshot**, **Record Video**, and **Record GIF** global shortcuts are assigned by
   default. **Recognize Text (OCR)** now starts unbound, alongside the direct Screenshot region,
   window, and screen shortcuts, and can be set in Settings → Keyboard shortcuts. (#451)
+
+### Fixed
+- Screenshot-editor background preset captions now match the selected style, and custom color
+  selection opens in a native WinUI picker dialog instead of being clipped inside the inspector.
 
 ## [v1.8.3-windows] - 2026-10-12
 

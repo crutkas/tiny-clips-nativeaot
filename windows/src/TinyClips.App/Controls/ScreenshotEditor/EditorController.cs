@@ -841,6 +841,17 @@ internal sealed class EditorController : IDisposable
         }
     }
 
+    public void SetCustomBgColor2(Color color)
+    {
+        if (BgColor2 == color) return;
+        BgColor2 = color;
+        if (BgStyle == ExportBackgroundStyle.Gradient)
+        {
+            MarkDirty();
+            BackgroundChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     public void SetGradientDirectionDegrees(double degrees)
     {
         if (!double.IsFinite(degrees) || degrees is < 0 or > 360)

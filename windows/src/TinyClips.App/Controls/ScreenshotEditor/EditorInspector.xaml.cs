@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -147,7 +148,6 @@ public sealed partial class EditorInspector : UserControl
         }
 
         BgStyleCombo.SelectedIndex = 0;
-        BgColorPicker.Color = _controller.BgColor;
         GradientDirectionSlider.Value = _controller.GradientDirectionDegrees;
         PaddingSlider.Value = _controller.CanvasPadding;
         CornerSlider.Value = _controller.CanvasCornerRadius;
@@ -714,9 +714,9 @@ public sealed partial class EditorInspector : UserControl
 
             _bgInitializing = true;
             BgStyleCombo.SelectedIndex = preset.Style == ExportBackgroundStyle.Gradient ? 2 : 1;
-            BgColorPicker.Color = preset.Primary;
             _bgInitializing = false;
 
+            SyncBackgroundColorSwatches();
             UpdateBackgroundStyleUi();
         }
     }
@@ -740,31 +740,95 @@ public sealed partial class EditorInspector : UserControl
 
     private void UpdateBackgroundStyleUi()
     {
-        SolidPresetGrid.Visibility = _controller.BgStyle == ExportBackgroundStyle.Solid ? Visibility.Visible : Visibility.Collapsed;
-        GradientPresetGrid.Visibility = _controller.BgStyle == ExportBackgroundStyle.Gradient ? Visibility.Visible : Visibility.Collapsed;
-        GradientDirectionSlider.Visibility = _controller.BgStyle == ExportBackgroundStyle.Gradient ? Visibility.Visible : Visibility.Collapsed;
-        CustomColorPanel.Visibility = _controller.BgStyle == ExportBackgroundStyle.Solid ? Visibility.Visible : Visibility.Collapsed;
+        var showSolid = _controller.BgStyle == ExportBackgroundStyle.Solid;
+        var showGradient = _controller.BgStyle == ExportBackgroundStyle.Gradient;
+
+        SolidPresetHeader.Visibility = showSolid ? Visibility.Visible : Visibility.Collapsed;
+        SolidPresetGrid.Visibility = showSolid ? Visibility.Visible : Visibility.Collapsed;
+        GradientPresetHeader.Visibility = showGradient ? Visibility.Visible : Visibility.Collapsed;
+        GradientPresetGrid.Visibility = showGradient ? Visibility.Visible : Visibility.Collapsed;
+        GradientDirectionSlider.Visibility = showGradient ? Visibility.Visible : Visibility.Collapsed;
+        CustomColorPanel.Visibility = showSolid ? Visibility.Visible : Visibility.Collapsed;
+        CustomGradientColorPanel.Visibility = showGradient ? Visibility.Visible : Visibility.Collapsed;
+        SyncBackgroundColorSwatches();
     }
 
-    private void OnBgCustomColorChanged(ColorPicker sender, ColorChangedEventArgs args)
+    private void SyncBackgroundColorSwatches()
     {
-        if (_bgInitializing)
+        CustomSolidColorSwatch.Background = new SolidColorBrush(_controller.BgColor);
+        GradientStartColorSwatch.Background = new SolidColorBrush(_controller.BgColor);
+        GradientEndColorSwatch.Background = new SolidColorBrush(_controller.BgColor2);
+    }
+
+    private async void OnChooseCustomSolidColor(object sender, RoutedEventArgs e)
+    {
+        var color = await ShowBackgroundColorDialogAsync("Choose a solid background color", _controller.BgColor);
+        if (color is not { } selectedColor)
         {
             return;
         }
 
-        _controller.SetCustomBgColor(args.NewColor);
-    }
-
-    private void OnApplyCustomSolidBackground(object sender, RoutedEventArgs e)
-    {
-        _controller.ApplyCustomSolidBackground(BgColorPicker.Color);
+        _controller.ApplyCustomSolidBackground(selectedColor);
 
         _bgInitializing = true;
         BgStyleCombo.SelectedIndex = 1;
         _bgInitializing = false;
 
         UpdateBackgroundStyleUi();
+    }
+
+    private async void OnChooseGradientStartColor(object sender, RoutedEventArgs e)
+    {
+        var color = await ShowBackgroundColorDialogAsync("Choose the first gradient color", _controller.BgColor);
+        if (color is not { } selectedColor)
+        {
+            return;
+        }
+
+        _controller.SetCustomBgColor(selectedColor);
+        SyncBackgroundColorSwatches();
+    }
+
+    private async void OnChooseGradientEndColor(object sender, RoutedEventArgs e)
+    {
+        var color = await ShowBackgroundColorDialogAsync("Choose the second gradient color", _controller.BgColor2);
+        if (color is not { } selectedColor)
+        {
+            return;
+        }
+
+        _controller.SetCustomBgColor2(selectedColor);
+        SyncBackgroundColorSwatches();
+    }
+
+    private async Task<Color?> ShowBackgroundColorDialogAsync(string title, Color initialColor)
+    {
+        var picker = new ColorPicker
+        {
+            Color = initialColor,
+            ColorSpectrumShape = ColorSpectrumShape.Box,
+            IsAlphaEnabled = false,
+            IsColorChannelTextInputVisible = false,
+            IsColorPreviewVisible = true,
+            IsColorSliderVisible = true,
+            IsHexInputVisible = true,
+            IsMoreButtonVisible = false,
+        };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(picker, title);
+
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = picker,
+            PrimaryButtonText = "Apply",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.XamlRoot,
+            RequestedTheme = this.RequestedTheme,
+        };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(dialog, "EditorBackgroundColorDialog");
+
+        return await dialog.ShowAsync() == ContentDialogResult.Primary ? picker.Color : null;
     }
 
     private void OnPaddingChanged(object sender, RangeBaseValueChangedEventArgs e)
