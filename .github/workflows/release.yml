@@ -249,8 +249,8 @@ jobs:
             (
               index
               for index, line in enumerate(changelog_lines)
-              if re.match(rf"^##\\s+{re.escape(release_tag)}(?:\\s+-.*)?$", line)
-              or re.match(rf"^##\\s+{re.escape(release_tag_base)}(?:\\s+-.*)?$", line)
+              if re.match(rf"^##\s+{re.escape(release_tag)}(?:\s+-.*)?$", line)
+              or re.match(rf"^##\s+{re.escape(release_tag_base)}(?:\s+-.*)?$", line)
             ),
             None,
           )
