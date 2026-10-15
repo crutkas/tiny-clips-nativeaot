@@ -54,7 +54,7 @@ svg:has(> use[href^="#i-"]) { fill: none; stroke: currentColor; stroke-width: 1.
   animation: scene-on var(--dur) linear var(--start), scene-in 0.45s var(--out) var(--start) both;
 }
 @keyframes scene-on { from, to { visibility: visible; } }
-@keyframes scene-in { from { scale: 1.05; } }
+@keyframes scene-in { from { scale: var(--motion-scene, 1.05); } }
 
 [class*="a-"] {
   animation-duration: calc(var(--d, 0.5s) * var(--motion-speed));
@@ -73,11 +73,11 @@ svg:has(> use[href^="#i-"]) { fill: none; stroke: currentColor; stroke-width: 1.
 .a-slam { animation-name: a-slam; --d: 0.34s; }
 @keyframes a-slam { from { opacity: 0; scale: var(--motion-slam); filter: blur(var(--motion-blur)); } }
 .a-rise { animation-name: a-rise; --d: 0.7s; }
-@keyframes a-rise { from { opacity: 0; translate: 0 calc(140px * var(--motion-distance)); scale: 0.9; } }
+@keyframes a-rise { from { opacity: 0; translate: 0 calc(140px * var(--motion-distance)); scale: calc(1 - 0.1 * var(--motion-distance)); } }
 .a-wipe { animation-name: a-wipe; --ease: cubic-bezier(0.6, 0, 0.2, 1); }
 @keyframes a-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 .a-drop { animation-name: a-drop; --ease: var(--snap); --d: 0.45s; }
-@keyframes a-drop { from { opacity: 0; translate: 0 calc(-160px * var(--motion-distance)); scale: var(--motion-drop); rotate: -40deg; } }
+@keyframes a-drop { from { opacity: 0; translate: 0 calc(-160px * var(--motion-distance)); scale: var(--motion-drop); rotate: calc(-40deg * var(--motion-distance)); } }
 .a-key { animation-name: a-key; --d: 0.4s; }
 @keyframes a-key {
   from { opacity: 0; translate: 0 calc(-26px * var(--motion-distance)); }
@@ -97,25 +97,23 @@ svg:has(> use[href^="#i-"]) { fill: none; stroke: currentColor; stroke-width: 1.
 .b1 {
   left: -420px; top: 380px; width: 1300px; height: 1300px;
   background: radial-gradient(closest-side, var(--glow-a), transparent);
-  animation: drift 9s ease-in-out infinite alternate;
+  animation: drift 18s ease-in-out infinite alternate;
 }
 .b2 {
   right: -380px; top: -520px; width: 1400px; height: 1400px;
   background: radial-gradient(closest-side, var(--glow-b), transparent);
-  animation: drift 11s ease-in-out -4s infinite alternate-reverse;
+  animation: drift 22s ease-in-out -4s infinite alternate-reverse;
 }
 .b3 {
   left: 620px; top: 200px; width: 900px; height: 900px;
   background: radial-gradient(closest-side, var(--glow-c), transparent);
-  animation: drift 7s ease-in-out -2s infinite alternate;
+  animation: drift 14s ease-in-out -2s infinite alternate;
 }
-@keyframes drift { from { translate: -70px 40px; scale: 0.94; } to { translate: 90px -60px; scale: 1.08; } }
-.camera {
-  position: absolute; inset: 0;
-  animation: kick var(--beat) cubic-bezier(0.2, 0.7, 0.2, 1) calc(var(--bar) * 2) 56,
-             kick var(--beat) cubic-bezier(0.2, 0.7, 0.2, 1) calc(var(--bar) * 17) 16;
+@keyframes drift {
+  from { translate: calc(-70px * var(--motion-distance)) calc(40px * var(--motion-distance)); scale: calc(1 - 0.06 * var(--motion-distance)); }
+  to { translate: calc(90px * var(--motion-distance)) calc(-60px * var(--motion-distance)); scale: calc(1 + 0.08 * var(--motion-distance)); }
 }
-@keyframes kick { from { scale: var(--motion-camera); } to { scale: 1; } }
+.camera { position: absolute; inset: 0; }
 
 .tint {
   position: absolute; inset: 0;
@@ -771,9 +769,9 @@ kbd {
 .editor-caption { position: absolute; left: 110px; top: 70px; font-size: 40px; color: var(--lav); }
 .s-editor-b .tool-list { top: 225px; gap: 26px; }
 .s-editor-b .tool-list li, .s-editor-b .tool-list li::before { animation-duration: calc(var(--beat) * 1.5); }
-.s-editor-b .tool-list li.long, .s-editor-b .tool-list li.long::before { animation-duration: calc(var(--beat) * 4.5); }
+.s-editor-b .tool-list li.long, .s-editor-b .tool-list li.long::before { animation-duration: calc(var(--beat) * 1.5); }
 .s-editor-b .canvas { top: 200px; }
-.s-editor-b .canvas-card { animation-delay: calc(var(--start) + var(--beat) * 7.5); }
+.s-editor-b .canvas-card { animation-delay: calc(var(--start) + var(--beat) * 3); }
 .s-toolkit { text-align: center; }
 .s-toolkit > .kicker { position: absolute; left: 0; right: 0; top: 115px; color: var(--cyan); }
 .s-toolkit > h2 { position: absolute; left: 0; right: 0; top: 200px; font-size: 108px; font-weight: 750; }
@@ -783,6 +781,42 @@ kbd {
 .capture-formats strong { font-size: 48px; }
 .capture-formats span { font-size: 28px; color: var(--lav); }
 .toolkit-note { position: absolute; left: 0; right: 0; top: 875px; font-size: 38px; color: var(--lav); }
+.s-toolkit .toolkit-note { top: 790px; }
+
+.s-studio-result .tint { background: radial-gradient(ellipse 68% 82% at 71% 48%, color-mix(in srgb, var(--cyan) 20%, transparent), transparent 74%); }
+.result-copy { position: absolute; left: 115px; top: 275px; width: 550px; }
+.result-copy .kicker { font-size: 25px; color: var(--cyan); }
+.result-copy h2 { margin-top: 30px; font-size: 77px; line-height: 1.08; font-weight: 750; letter-spacing: -0.045em; }
+.result-prompt { display: grid; gap: 12px; margin-top: 42px; font-size: 29px; color: var(--lav); }
+.result-prompt b { display: inline-flex; align-items: center; width: fit-content; padding: 16px 24px; border: 1px solid color-mix(in srgb, var(--cyan) 55%, transparent); border-radius: 14px; color: #fff; background: color-mix(in srgb, var(--cyan) 14%, var(--surface)); font-size: 29px; font-weight: 700; }
+.result-preview { position: absolute; left: 735px; top: 173px; width: 1070px; }
+.result-demo { height: 625px; border: 1px solid var(--line); box-shadow: 0 36px 100px #0008; }
+.result-backdrop { background: linear-gradient(135deg, #2666ab, #2fc2bd); animation: result-colour var(--dur) ease-in-out var(--start) both; }
+@keyframes result-colour {
+  0%, 32% { background: linear-gradient(135deg, #2666ab, #2fc2bd); }
+  55%, 76% { background: linear-gradient(135deg, #6257c9, #71a7e8); }
+  100% { background: linear-gradient(135deg, #303d85, #5cb5a6); }
+}
+.result-screen { animation-name: result-zoom; animation-duration: var(--dur); animation-timing-function: var(--out); animation-delay: var(--start); animation-fill-mode: both; }
+@keyframes result-zoom {
+  0%, 25% { left: 6%; top: 10%; width: 88%; height: 80%; transform: scale(1); }
+  42%, 62% { left: 6%; top: 14%; width: 58%; height: 72%; transform: scale(1.05); }
+  82%, 100% { left: 10%; top: 18%; width: 54%; height: 64%; transform: scale(1); }
+}
+.result-camera { z-index: 1; }
+.render-stamp { position: absolute; z-index: 2; left: 26px; top: 24px; padding: 10px 16px; border: 1px solid #ffffff55; border-radius: 10px; background: #07111a88; color: #fff; font: 700 17px/1.2 var(--mono); letter-spacing: 0.08em; }
+.render-stamp b { margin-left: 12px; color: var(--cyan); }
+.render-pointer { position: absolute; z-index: 2; left: 31%; top: 40%; width: 26px; height: 26px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 0 #fff9; animation: render-cursor calc(var(--beat) * 8) var(--out) calc(var(--start) + var(--beat)) both; }
+@keyframes render-cursor { 0% { left: 31%; top: 40%; box-shadow: 0 0 0 0 #fff9; } 28% { left: 55%; top: 47%; box-shadow: 0 0 0 12px #fff0; } 38% { left: 56%; top: 48%; box-shadow: 0 0 0 0 #fff9; } 72% { left: 39%; top: 30%; box-shadow: 0 0 0 12px #fff0; } 82%, 100% { left: 39%; top: 30%; box-shadow: 0 0 0 0 #fff0; } }
+.render-scene-label { position: absolute; z-index: 2; left: 28px; top: 84px; display: grid; gap: 6px; color: #ffffffaa; font: 700 14px/1.2 var(--mono); letter-spacing: 0.12em; }
+.render-scene-label span { color: #fff; font: 700 21px/1.2 var(--font); letter-spacing: 0; }
+.render-features { position: absolute; z-index: 2; left: 28px; right: 28px; bottom: 68px; display: flex; justify-content: center; gap: 14px; }
+.render-features span { padding: 9px 17px; border: 1px solid #ffffff55; border-radius: 999px; background: #081322aa; color: #fff; font-size: 19px; font-weight: 650; }
+.render-progress { position: absolute; z-index: 2; left: 28px; right: 28px; bottom: 30px; height: 4px; border-radius: 2px; background: #ffffff55; overflow: hidden; }
+.render-progress i { display: block; width: 100%; height: 100%; background: var(--cyan); transform: scaleX(0); transform-origin: left; animation: render-progress calc(var(--beat) * 8) linear calc(var(--start) + var(--beat)) both; }
+@keyframes render-progress { to { transform: scaleX(1); } }
+.render-end-card { position: absolute; z-index: 2; left: 50%; top: 50%; translate: -50% -50%; padding: 16px 28px; border: 1px solid #ffffff77; border-radius: 14px; background: #081322bb; color: #fff; font-size: 25px; font-weight: 700; opacity: 0; animation: render-endcard calc(var(--beat) * 8) ease calc(var(--start) + var(--beat)) both; }
+@keyframes render-endcard { 0%, 78% { opacity: 0; scale: 0.97; } 86%, 100% { opacity: 1; scale: 1; } }
 
 /* ---- Preview chrome (never rendered) ------------------------------------------------------ */
 

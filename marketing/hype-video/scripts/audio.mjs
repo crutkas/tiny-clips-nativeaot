@@ -407,6 +407,15 @@ for (let b = 0; b < BARS; b++) {
     }
   }
 
+  if (lofi && !last) {
+    const notes = [chord.notes[2] + 12, chord.notes[1] + 12, chord.notes[3] + 12, chord.notes[2] + 12];
+    [0.5, 1.5, 2.5, 3.25].forEach((beat, i) => {
+      synthNote(music, t + beat * BEAT, notes[i], BEAT * 0.45, 0.17,
+        (tt) => 1700 + 900 * Math.exp(-tt * 5),
+        { release: 0.16, attack: 0.025, waveform: 'triangle', voices: 1, rev: 0.18, pan: i % 2 ? 0.18 : -0.18 });
+    });
+  }
+
   // Arp
   if (!last && MUSIC_STYLE === 'electronic') {
     const level = isIntro(b) ? lerp(0.035, 0.08, (b + 0.5) / 2) : isBreak(b) ? 0.05 : 0.075;

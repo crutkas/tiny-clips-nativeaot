@@ -27,7 +27,7 @@ All notable changes to this project will be documented in this file.
 - macOS General settings have a new **Confirm before closing editors with Esc** option, on by default, covering the screenshot editor, video trimmer, and GIF trimmer. Turn it off to close them with a single Esc press, which discards anything unsaved.
 
 ### Changed
-- The Tiny Clips 2.0 launch video leads with Studio on macOS and Windows, combining animated layouts with privacy-safe recorded editor controls before recent capture features and the download screen.
+- The Tiny Clips 2.0 launch video leads with Studio on macOS and Windows, combining animated layouts, a rendered-video preview, and privacy-safe recorded editor controls before recent capture features and the download screen.
 - The macOS **Screenshot Region**, **Screenshot Screen**, and **Screenshot Window** shortcuts now use the same icons in Settings as in the capture picker.
 - Pressing Esc in the macOS screenshot editor now asks before closing it, and warns when closing would discard a capture that has not been saved yet.
 - Pressing Esc in the macOS video and GIF trimmers now asks before closing them too, and warns when closing would discard a recording that has not been saved yet or trim changes that have not been exported.

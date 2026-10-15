@@ -46,9 +46,10 @@
     developer: ['Record it.', 'Explain it.', 'Ship it.'],
   };
   const MOTION = {
-    subtle: { speed: 1.25, distance: '0.55', slam: '1.35', drop: '1.4', blur: '8px', camera: '1.003', flash: '0.45', pop: '0.7', tile: '0.82' },
+    subtle: { speed: 1, distance: '0.25', scene: '1.012', slam: '1.08', drop: '1.06', blur: '2px', camera: '1', flash: '0.1', pop: '0.97', tile: '0.95' },
     punchy: { speed: 1, distance: '1', slam: '2.1', drop: '1.8', blur: '16px', camera: '1.014', flash: '1', pop: '0.4', tile: '0.6' },
     'high-impact': { speed: 0.82, distance: '1.3', slam: '2.6', drop: '2.6', blur: '22px', camera: '1.024', flash: '1.35', pop: '0.25', tile: '0.35' },
+    // Legacy punch profiles retain their scene cut scale; the current subdued cut barely moves.
   };
   const THEMES = {
     neon: {},
@@ -72,6 +73,7 @@
   for (const [name, value] of Object.entries(theme)) document.documentElement.style.setProperty(name, value);
   document.documentElement.style.setProperty('--motion-speed', motion.speed);
   document.documentElement.style.setProperty('--motion-distance', motion.distance);
+  document.documentElement.style.setProperty('--motion-scene', motion.scene ?? '1.05');
   document.documentElement.style.setProperty('--motion-slam', motion.slam);
   document.documentElement.style.setProperty('--motion-drop', motion.drop);
   document.documentElement.style.setProperty('--motion-blur', motion.blur);
@@ -248,10 +250,11 @@
       </main>
     </div>`;
   for (const demo of document.querySelectorAll('[data-studio-demo]')) {
+    const result = demo.dataset.studioDemo === 'result';
     demo.innerHTML = `
-      <div class="demo-backdrop"></div>
-      <div class="demo-screen"><div class="win" data-mock="app"></div></div>
-      <div class="demo-camera">
+      <div class="${result ? 'demo-backdrop result-backdrop' : 'demo-backdrop'}"></div>
+      <div class="${result ? 'demo-screen result-screen' : 'demo-screen'}"><div class="win" data-mock="app"></div></div>
+      <div class="${result ? 'demo-camera result-camera' : 'demo-camera'}">
         <svg viewBox="0 0 200 240" aria-hidden="true">
           <ellipse cx="100" cy="240" rx="90" ry="100" fill="#567dff"/>
           <rect x="80" y="117" width="40" height="63" rx="18" fill="#dba58c"/>
@@ -259,7 +262,14 @@
           <path d="M50 94C35 3 162-15 153 94L137 56C112 81 87 51 63 68Z" fill="#162d49"/>
         </svg>
       </div>
-      <div class="demo-layout-label"><span>Camera bubble</span><span>Side by side</span></div>`;
+      ${result ? `
+        <span class="render-stamp">STUDIO EXPORT <b>MP4</b></span>
+        <span class="render-pointer"></span>
+        <div class="render-scene-label">SCENE 01 <span>Side by side</span></div>
+        <div class="render-features"><span>3 scenes</span><span>Zoom</span><span>Cut</span><span>2× speed</span></div>
+        <div class="render-progress"><i></i></div>
+        <div class="render-end-card">Your story, ready to share.</div>` :
+        '<div class="demo-layout-label"><span>Camera bubble</span><span>Side by side</span></div>'}`;
   }
   for (const el of document.querySelectorAll('[data-mock="app"]')) el.innerHTML = MOCK_APP;
 
@@ -477,7 +487,7 @@
     const times = [...document.querySelectorAll('.scene')].map((scene) => (parseFloat(scene.dataset.bar) + parseFloat(scene.dataset.bars) * 0.85) * BAR);
     const newsStart = Number(document.getElementById('whats-new').dataset.bar) * BAR;
     for (const tile of document.querySelectorAll('#new-tiles .tile')) times.push(newsStart + (parseFloat(tile.dataset.at) + 1.5) * BEAT);
-    for (const bar of [2, 3.5, 5.5, 7, 9.5, 11, 12.75, 13.5, 14.5]) times.push(bar * BAR);
+    for (const bar of [1.5, 3, 4.5, 6, 7.75, 8.5, 9.5, 10.5, 11.5, 12.75, 13.5, 14.5, 15.5, 16.5]) times.push(bar * BAR);
     times.push(DURATION - 0.05);
     return [...new Set(times.map((t) => Math.round(t * 100) / 100))].sort((a, b) => a - b);
   }
