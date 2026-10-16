@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+- Set the macOS app version to **2.0.0** for direct and Mac App Store builds.
+
 ## v1.9.0-mac - 2026-10-16
 
 ### Added

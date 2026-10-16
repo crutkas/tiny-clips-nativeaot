@@ -5,6 +5,9 @@ own `CHANGELOG.md` at the repository root.
 
 ## [Unreleased]
 
+### Changed
+- Set the Windows app version to **2.0.0** (package version **2.0.0.0**) for direct and Microsoft Store builds, including assembly version metadata.
+
 ### Added
 - **What's New introduces Studio.** A new illustrated screen-and-camera composition and editing highlights explain the early preview, with a switch to enable it right there. It appears once per content revision for existing users, not on every app update; new installs keep the onboarding tour. The switch is saved, and ordinary video recording stays unchanged.
 - **Tiny Clips Studio (early preview, off by default).** Studio records the screen and the camera
