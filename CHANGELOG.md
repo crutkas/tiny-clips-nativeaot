@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v1.8.4-mac - 2026-10-15
+
 ### Fixed
 - macOS screenshots now copy to the clipboard when **Save immediately** is disabled and the screenshot editor is open.
 
