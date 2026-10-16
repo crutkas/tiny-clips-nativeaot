@@ -7,6 +7,9 @@ own `CHANGELOG.md` at the repository root.
 
 ### Changed
 - Set the Windows app version to **2.0.0** (package version **2.0.0.0**) for direct and Microsoft Store builds, including assembly version metadata.
+- Microsoft Store uploads now include crash-report symbols for x64 and ARM64. Packaging and
+  submission fail if the upload is missing matching app or core symbols, and symbol-tool
+  prerequisites are resolved explicitly instead of silently skipping symbol generation.
 
 ### Added
 - **What's New introduces Studio.** A new illustrated screen-and-camera composition and editing highlights explain the early preview, with a switch to enable it right there. It appears once per content revision for existing users, not on every app update; new installs keep the onboarding tour. The switch is saved, and ordinary video recording stays unchanged.
