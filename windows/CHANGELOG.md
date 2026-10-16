@@ -5,6 +5,8 @@ own `CHANGELOG.md` at the repository root.
 
 ## [Unreleased]
 
+## [v1.9.0-windows] - 2026-10-16
+
 ### Added
 - **Gradient direction** — choose any direction from 0° to 360° for screenshot-editor gradient backgrounds; the preview and exported image stay in sync. (#463)
 - **Custom gradient colors** — choose independent custom colors for both ends of a screenshot-editor gradient.
