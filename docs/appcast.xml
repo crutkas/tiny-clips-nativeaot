@@ -11,24 +11,24 @@
         <item>
             
             
-            <title>1.8.0.0</title>
+            <title>1.9.0</title>
             
             
-            <pubDate>Mon, 28 Sep 2026 21:34:46 +0000</pubDate>
+            <pubDate>Fri, 16 Oct 2026 17:05:07 +0000</pubDate>
             
             
-            <sparkle:version>61</sparkle:version>
+            <sparkle:version>64</sparkle:version>
             
             
-            <sparkle:shortVersionString>1.8.0.0</sparkle:shortVersionString>
+            <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
             
             
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             
             
-            <description><![CDATA[<h3>What's Changed</h3><ul><li>Merge pull request #375 from jamesmontemagno/release/v1.8.0.0-mac</li></ul><p><a href="https://github.com/jamesmontemagno/tiny-clips/compare/v1.7.5-mac...v1.8.0.0-mac">Full Changelog</a></p>]]></description>
-            <sparkle:releaseNotesLink>https://github.com/jamesmontemagno/tiny-clips/releases/tag/v1.8.0.0-mac</sparkle:releaseNotesLink>
-            <enclosure url="https://github.com/jamesmontemagno/tiny-clips/releases/download/v1.8.0.0-mac/TinyClips-v1.8.0.0-mac.zip" length="4660035" type="application/octet-stream" sparkle:edSignature="L/aIhG53zXr97eoX/lMxcqfr4IzaudB90SbwXWXfqc4V57iSK9CdTKy1OQOadpEOYx7tjceXcF9/OhsaMtzbAQ=="/>
+            <description><![CDATA[<h3>Added</h3><ul><li>macOS Screenshot settings now offer an opt-in **Advanced &gt; Exclude ClickLight overlays** option to keep ClickLight rings and other overlays out of region, screen, and scrolling screenshots without adding a delay or configuring ClickLight shortcuts. Video and GIF recordings are unchanged.</li></ul><p><a href="https://github.com/jamesmontemagno/tiny-clips/compare/v1.8.4-mac...v1.9.0-mac">Full Changelog</a></p>]]></description>
+            <sparkle:releaseNotesLink>https://github.com/jamesmontemagno/tiny-clips/releases/tag/v1.9.0-mac</sparkle:releaseNotesLink>
+            <enclosure url="https://github.com/jamesmontemagno/tiny-clips/releases/download/v1.9.0-mac/TinyClips-v1.9.0-mac.zip" length="4863438" type="application/octet-stream" sparkle:edSignature="2jxZTcsJKm+vF2ey+P7rDZbi4ReAQIGhfHTYxJTL/GEJY0XEJ89WVhzvHP1RRDhmdONPwjWvpsu//QpCKsseCQ=="/>
             
         
         </item>

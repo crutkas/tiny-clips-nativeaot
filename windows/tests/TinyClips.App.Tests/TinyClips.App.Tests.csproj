@@ -65,6 +65,13 @@
     <EmbeddedResource Include="..\..\src\TinyClips.App\Controls\Settings\StudioSettingsSection.xaml.cs" Link="Settings\Markup\%(Filename)%(Extension)" LogicalName="SettingsMarkup.%(Filename)%(Extension)" />
     <!-- A clock a test advances by hand, shared with the Core tests. -->
     <Compile Include="..\TinyClips.Core.Tests\ManualTimeProvider.cs" Link="Support\ManualTimeProvider.cs" />
+    <Compile Include="..\..\src\TinyClips.App\Views\CapturePickerKeyboardShortcuts.cs" Link="CapturePickerKeyboardShortcuts.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\src\TinyClips.App\Views\CapturePickerWindow.xaml"
+             Link="Fixtures\CapturePickerWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

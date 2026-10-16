@@ -368,6 +368,7 @@
                         </ComboBox>
 
                         <TextBlock
+                            x:Name="SolidPresetHeader"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Text="Solid presets" />
@@ -378,6 +379,7 @@
                             SelectionMode="None" />
 
                         <TextBlock
+                            x:Name="GradientPresetHeader"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Text="Gradient presets" />
@@ -387,26 +389,80 @@
                             AutomationProperties.Name="Gradient background presets"
                             SelectionMode="None" />
 
+                        <Slider
+                            x:Name="GradientDirectionSlider"
+                            AutomationProperties.AutomationId="EditorGradientDirectionSlider"
+                            AutomationProperties.Name="Gradient direction"
+                            Header="Gradient direction"
+                            Maximum="360"
+                            Minimum="0"
+                            StepFrequency="1"
+                            ToolTipService.ToolTip="Direction from the first color to the second. 0° is left to right; 90° is top to bottom."
+                            ValueChanged="OnGradientDirectionChanged" />
+
                         <StackPanel x:Name="CustomColorPanel" Spacing="8">
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Text="Custom color" />
-                            <ColorPicker
-                                x:Name="BgColorPicker"
-                                MinWidth="0"
-                                ColorChanged="OnBgCustomColorChanged"
-                                ColorSpectrumShape="Box"
-                                IsAlphaEnabled="False"
-                                IsColorPreviewVisible="True"
-                                IsColorSliderVisible="True"
-                                IsHexInputVisible="True"
-                                IsMoreButtonVisible="False" />
                             <Button
                                 HorizontalAlignment="Stretch"
-                                AutomationProperties.AutomationId="EditorApplyCustomBgButton"
-                                Click="OnApplyCustomSolidBackground"
-                                Content="Use as solid background" />
+                                HorizontalContentAlignment="Left"
+                                AutomationProperties.AutomationId="EditorCustomSolidBgColorButton"
+                                AutomationProperties.Name="Choose custom solid background color"
+                                Click="OnChooseCustomSolidColor">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border
+                                        x:Name="CustomSolidColorSwatch"
+                                        Width="22"
+                                        Height="22"
+                                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4" />
+                                    <TextBlock VerticalAlignment="Center" Text="Choose color..." />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel x:Name="CustomGradientColorPanel" Spacing="8">
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="Custom gradient colors" />
+                            <Button
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                AutomationProperties.AutomationId="EditorGradientStartColorButton"
+                                AutomationProperties.Name="Choose first gradient color"
+                                Click="OnChooseGradientStartColor">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border
+                                        x:Name="GradientStartColorSwatch"
+                                        Width="22"
+                                        Height="22"
+                                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4" />
+                                    <TextBlock VerticalAlignment="Center" Text="First color..." />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                AutomationProperties.AutomationId="EditorGradientEndColorButton"
+                                AutomationProperties.Name="Choose second gradient color"
+                                Click="OnChooseGradientEndColor">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border
+                                        x:Name="GradientEndColorSwatch"
+                                        Width="22"
+                                        Height="22"
+                                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4" />
+                                    <TextBlock VerticalAlignment="Center" Text="Second color..." />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
 
                         <Slider

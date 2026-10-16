@@ -102,6 +102,43 @@ final class CaptureSettingsTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: CaptureSettings.screenshotEditorNativeSizeKey))
     }
 
+    func testClickLightScreenshotExclusionDefaultsOff() {
+        let settings = CaptureSettings(defaults: defaults, performMigrations: false)
+
+        XCTAssertFalse(settings.excludeClickLightFromScreenshots)
+        XCTAssertTrue(settings.screenshotExcludedApplicationBundleIdentifiers.isEmpty)
+    }
+
+    func testClickLightScreenshotExclusionPersistsAndMatchesOnlyClickLight() {
+        let settings = CaptureSettings(defaults: defaults, performMigrations: false)
+        settings.excludeClickLightFromScreenshots = true
+
+        let restored = CaptureSettings(defaults: defaults, performMigrations: false)
+        XCTAssertTrue(defaults.bool(forKey: "excludeClickLightFromScreenshots"))
+        XCTAssertTrue(restored.excludeClickLightFromScreenshots)
+        XCTAssertEqual(restored.screenshotExcludedApplicationBundleIdentifiers, ["com.aurorascharff.ClickLight"])
+    }
+
+    func testDisablingClickLightScreenshotExclusionRemovesApplicationExclusion() {
+        let settings = CaptureSettings(defaults: defaults, performMigrations: false)
+        settings.excludeClickLightFromScreenshots = true
+        settings.excludeClickLightFromScreenshots = false
+
+        XCTAssertFalse(defaults.bool(forKey: "excludeClickLightFromScreenshots"))
+        XCTAssertTrue(settings.screenshotExcludedApplicationBundleIdentifiers.isEmpty)
+    }
+
+    func testClickLightScreenshotExclusionIsResetWithStoredSettings() {
+        defaults.set(true, forKey: "excludeClickLightFromScreenshots")
+
+        CaptureSettings.resetStoredDefaults(defaults)
+
+        XCTAssertNil(defaults.object(forKey: "excludeClickLightFromScreenshots"))
+        let settings = CaptureSettings(defaults: defaults, performMigrations: false)
+        XCTAssertFalse(settings.excludeClickLightFromScreenshots)
+        XCTAssertTrue(settings.screenshotExcludedApplicationBundleIdentifiers.isEmpty)
+    }
+
     func testRecordingVideoCodecResolverDefaultsToH264() {
         let resolved = RecordingVideoCodecResolver.resolved(requested: .h264, hevcAvailable: true)
 
@@ -226,16 +263,31 @@ final class CaptureSettingsTests: XCTestCase {
                 settings.hotKeyBinding(for: action),
                 custom
             )
+
+            settings.setHotKeyBinding(.unbound, for: action)
+            XCTAssertEqual(
+                settings.hotKeyBinding(for: action),
+                .unbound
+            )
         }
     }
 
-    func testScreenshotScreenHotKeyTreatsLegacyZeroPairAsUnbound() {
-        defaults.set(0, forKey: "screenshotScreenHotKeyCode")
-        defaults.set(0, forKey: "screenshotScreenHotKeyModifiers")
+    func testUnboundDefaultHotKeysTreatLegacyZeroPairAsUnbound() {
+        let legacyZeroActions: [(HotKeyAction, String)] = [
+            (.screenshotScreen, "screenshotScreen"),
+            (.screenshotRegion, "screenshotRegion"),
+            (.screenshotWindow, "screenshotWindow"),
+            (.copyTextFromRegion, "copyTextFromRegion"),
+        ]
 
-        XCTAssertEqual(
-            CaptureSettings.hotKeyBinding(for: .screenshotScreen, defaults: defaults),
-            HotKeyBinding.defaultBinding(for: .screenshotScreen)
-        )
+        for (action, prefix) in legacyZeroActions {
+            defaults.set(0, forKey: "\(prefix)HotKeyCode")
+            defaults.set(0, forKey: "\(prefix)HotKeyModifiers")
+
+            XCTAssertTrue(
+                CaptureSettings.hotKeyBinding(for: action, defaults: defaults).isUnbound,
+                "\(action.displayName) should resolve a legacy zero pair as unbound"
+            )
+        }
     }
 }

@@ -9,6 +9,70 @@ struct CaptureDisplayGeometry {
     let scaleFactor: CGFloat
 }
 
+enum ImagePixelDensity {
+    static let pointsPerInch: CGFloat = 72
+
+    static func normalizedScaleFactor(_ scaleFactor: CGFloat) -> CGFloat {
+        guard scaleFactor.isFinite, scaleFactor > 0 else { return 1 }
+        return scaleFactor
+    }
+
+    static func dpi(for scaleFactor: CGFloat) -> CGFloat {
+        pointsPerInch * normalizedScaleFactor(scaleFactor)
+    }
+
+    static func logicalSize(pixelWidth: Int, pixelHeight: Int, scaleFactor: CGFloat) -> NSSize {
+        let scaleFactor = normalizedScaleFactor(scaleFactor)
+        return NSSize(
+            width: CGFloat(pixelWidth) / scaleFactor,
+            height: CGFloat(pixelHeight) / scaleFactor
+        )
+    }
+
+    static func scaleFactor(for image: NSImage) -> CGFloat {
+        guard image.size.width.isFinite, image.size.width > 0,
+              image.size.height.isFinite, image.size.height > 0,
+              let representation = image.representations.max(by: {
+                  $0.pixelsWide * $0.pixelsHigh < $1.pixelsWide * $1.pixelsHigh
+              }) else {
+            return 1
+        }
+
+        let widthScale = CGFloat(representation.pixelsWide) / image.size.width
+        let heightScale = CGFloat(representation.pixelsHigh) / image.size.height
+        return normalizedScaleFactor(max(widthScale, heightScale))
+    }
+
+    static func loadImage(contentsOf url: URL) -> NSImage? {
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
+                as? [CFString: Any],
+              let dpiWidth = properties[kCGImagePropertyDPIWidth] as? NSNumber,
+              let dpiHeight = properties[kCGImagePropertyDPIHeight] as? NSNumber else {
+            return image
+        }
+
+        let scaleFactor = normalizedScaleFactor(
+            max(CGFloat(dpiWidth.doubleValue), CGFloat(dpiHeight.doubleValue)) / pointsPerInch
+        )
+        guard let representation = image.representations.max(by: {
+            $0.pixelsWide * $0.pixelsHigh < $1.pixelsWide * $1.pixelsHigh
+        }) else {
+            return image
+        }
+
+        let size = logicalSize(
+            pixelWidth: representation.pixelsWide,
+            pixelHeight: representation.pixelsHigh,
+            scaleFactor: scaleFactor
+        )
+        image.size = size
+        image.representations.forEach { $0.size = size }
+        return image
+    }
+}
+
 enum CaptureCoordinateMath {
     /// Height of the display that anchors global coordinates: ScreenCaptureKit measures Y down from
     /// the top-left of the display whose AppKit origin is (0, 0), which is not guaranteed to be the
@@ -107,14 +171,19 @@ enum CaptureCoordinateMath {
 }
 
 struct ScreenshotCapture {
+    private struct CaptureResult {
+        let image: CGImage
+        let scaleFactor: CGFloat
+    }
+
     static func capture(region: CaptureRegion) async throws -> URL {
         let destinationURL = SaveService.shared.generateURL(for: .screenshot)
         return try await capture(region: region, outputURL: destinationURL)
     }
 
     static func capture(region: CaptureRegion, outputURL: URL) async throws -> URL {
-        let image = try await captureImage(region: region)
-        return try saveImage(image, to: outputURL)
+        let result = try await captureResult(region: region)
+        return try saveImage(result.image, to: outputURL, scaleFactor: result.scaleFactor)
     }
 
     /// Captures the whole display natively and crops, because `SCStreamConfiguration.sourceRect`
@@ -122,7 +191,13 @@ struct ScreenshotCapture {
     /// Measured against a lossless crop of the same frame it loses ~5% gradient energy and leaves
     /// only ~86% of pixels identical. `CGImage.cropping(to:)` is a pure pixel copy.
     static func captureImage(region: CaptureRegion) async throws -> CGImage {
-        let filter = try await region.makeFilter()
+        (try await captureResult(region: region)).image
+    }
+
+    private static func captureResult(region: CaptureRegion) async throws -> CaptureResult {
+        let filter = try await region.makeFilter(
+            excludingApplicationBundleIdentifiers: CaptureSettings.shared.screenshotExcludedApplicationBundleIdentifiers
+        )
         let region = region.resolvingPixelScale(from: filter)
         let scaleFactor = region.scaleFactor
         let contentRect = filter.contentRect
@@ -146,7 +221,7 @@ struct ScreenshotCapture {
         guard !cropRect.isNull, let cropped = fullImage.cropping(to: cropRect) else {
             throw CaptureError.regionCropFailed
         }
-        return cropped
+        return CaptureResult(image: cropped, scaleFactor: scaleFactor)
     }
 
     static func captureWindow(_ window: SCWindow) async throws -> URL {
@@ -171,15 +246,23 @@ struct ScreenshotCapture {
         config.showsCursor = false
 
         let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-        return try saveImage(image, to: outputURL)
+        return try saveImage(image, to: outputURL, scaleFactor: scaleFactor)
     }
 
     // MARK: - Helpers
 
-    static func saveImage(_ image: CGImage, to outputURL: URL) throws -> URL {
+    static func saveImage(
+        _ image: CGImage,
+        to outputURL: URL,
+        scaleFactor: CGFloat = 1
+    ) throws -> URL {
         let settings = CaptureSettings.shared
         let imageType = settings.imageFormat.utType
-        var destinationProperties: [CFString: Any] = [:]
+        let dpi = ImagePixelDensity.dpi(for: scaleFactor)
+        var destinationProperties: [CFString: Any] = [
+            kCGImagePropertyDPIWidth: dpi,
+            kCGImagePropertyDPIHeight: dpi
+        ]
         if settings.imageFormat == .jpeg {
             destinationProperties[kCGImageDestinationLossyCompressionQuality] = settings.jpegQuality
         }
@@ -189,7 +272,11 @@ struct ScreenshotCapture {
             : image
 
         if settings.imageFormat == .webp {
-            guard let data = WebPImageEncoder.encode(imageToSave, quality: settings.jpegQuality) else {
+            guard let data = WebPImageEncoder.encode(
+                imageToSave,
+                quality: settings.jpegQuality,
+                scaleFactor: scaleFactor
+            ) else {
                 throw CaptureError.saveFailed
             }
             try data.write(to: outputURL, options: .atomic)
@@ -229,7 +316,11 @@ struct ScreenshotCapture {
 }
 
 enum WebPImageEncoder {
-    static func encode(_ image: CGImage, quality: Double) -> Data? {
+    static func encode(
+        _ image: CGImage,
+        quality: Double,
+        scaleFactor: CGFloat = 1
+    ) -> Data? {
         let width = image.width
         let height = image.height
         guard width > 0, height > 0, width <= Int(Int32.max) / 4,
@@ -270,6 +361,111 @@ enum WebPImageEncoder {
         }
         guard length > 0, let output else { return nil }
         defer { WebPFree(output) }
-        return Data(bytes: output, count: length)
+        let encoded = Data(bytes: output, count: length)
+        return addingPixelDensity(
+            to: encoded,
+            pixelWidth: width,
+            pixelHeight: height,
+            scaleFactor: scaleFactor
+        )
+    }
+
+    private static func addingPixelDensity(
+        to data: Data,
+        pixelWidth: Int,
+        pixelHeight: Int,
+        scaleFactor: CGFloat
+    ) -> Data? {
+        guard data.count >= 20,
+              data.prefix(4) == Data("RIFF".utf8),
+              data.subdata(in: 8..<12) == Data("WEBP".utf8),
+              pixelWidth > 0, pixelWidth <= 1 << 24,
+              pixelHeight > 0, pixelHeight <= 1 << 24 else {
+            return nil
+        }
+
+        var result: Data
+        if data.subdata(in: 12..<16) == Data("VP8X".utf8) {
+            guard littleEndianUInt32(in: data, at: 16) >= 10 else { return nil }
+            result = data
+            result[20] |= 0x08
+        } else {
+            result = Data(data.prefix(12))
+            result.append(contentsOf: "VP8X".utf8)
+            result.appendLittleEndian(UInt32(10))
+            result.append(0x08)
+            result.append(contentsOf: [0, 0, 0])
+            result.appendUInt24(UInt32(pixelWidth - 1))
+            result.appendUInt24(UInt32(pixelHeight - 1))
+            result.append(data.dropFirst(12))
+        }
+
+        let exif = exifPixelDensity(scaleFactor: scaleFactor)
+        result.append(contentsOf: "EXIF".utf8)
+        result.appendLittleEndian(UInt32(exif.count))
+        result.append(exif)
+        if exif.count.isMultiple(of: 2) == false {
+            result.append(0)
+        }
+
+        guard result.count - 8 <= Int(UInt32.max) else { return nil }
+        result.replaceSubrange(4..<8, with: UInt32(result.count - 8).littleEndianBytes)
+        return result
+    }
+
+    private static func exifPixelDensity(scaleFactor: CGFloat) -> Data {
+        let resolutionDenominator: UInt32 = 1_000
+        let resolutionNumerator = UInt32(
+            (ImagePixelDensity.dpi(for: scaleFactor) * CGFloat(resolutionDenominator)).rounded()
+        )
+        let firstRationalOffset: UInt32 = 50
+        var data = Data()
+        data.append(contentsOf: [0x49, 0x49])
+        data.appendLittleEndian(UInt16(42))
+        data.appendLittleEndian(UInt32(8))
+        data.appendLittleEndian(UInt16(3))
+        data.appendTIFFEntry(tag: 0x011A, type: 5, count: 1, value: firstRationalOffset)
+        data.appendTIFFEntry(tag: 0x011B, type: 5, count: 1, value: firstRationalOffset + 8)
+        data.appendTIFFEntry(tag: 0x0128, type: 3, count: 1, value: 2)
+        data.appendLittleEndian(UInt32(0))
+        data.appendLittleEndian(resolutionNumerator)
+        data.appendLittleEndian(resolutionDenominator)
+        data.appendLittleEndian(resolutionNumerator)
+        data.appendLittleEndian(resolutionDenominator)
+        return data
+    }
+
+    private static func littleEndianUInt32(in data: Data, at offset: Int) -> UInt32 {
+        guard offset >= 0, offset + 4 <= data.count else { return 0 }
+        return data[offset..<(offset + 4)]
+            .enumerated()
+            .reduce(UInt32(0)) { result, element in
+                result | UInt32(element.element) << (element.offset * 8)
+            }
+    }
+}
+
+private extension FixedWidthInteger {
+    var littleEndianBytes: [UInt8] {
+        withUnsafeBytes(of: littleEndian) { Array($0) }
+    }
+}
+
+private extension Data {
+    mutating func appendLittleEndian<T: FixedWidthInteger>(_ value: T) {
+        append(contentsOf: value.littleEndianBytes)
+    }
+
+    mutating func appendUInt24(_ value: UInt32) {
+        append(UInt8(value & 0xFF))
+        append(UInt8((value >> 8) & 0xFF))
+        append(UInt8((value >> 16) & 0xFF))
+    }
+
+    mutating func appendTIFFEntry(tag: UInt16, type: UInt16, count: UInt32, value: UInt32) {
+        appendLittleEndian(tag)
+        appendLittleEndian(type)
+        appendLittleEndian(count)
+        appendLittleEndian(value)
     }
 }

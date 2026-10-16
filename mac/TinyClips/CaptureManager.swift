@@ -199,6 +199,7 @@ class CaptureManager: ObservableObject {
     @Published private var scrollingCapturePanel: ScrollingCapturePanel?
     private var scrollingCaptureSession: ScrollingPanoramaCapture?
     private var scrollingCapturePanelPosition: NSPoint?
+    private var scrollingCaptureScaleFactor: CGFloat = 1
     private var isStoppingScrollingCapture = false
     private var processingIndicatorShownAt: Date?
     private var isStoppingRecording = false
@@ -577,6 +578,7 @@ class CaptureManager: ObservableObject {
 
     private func startScrollingCapture(region: CaptureRegion, shouldReturnToPickerAfterCapture: Bool) {
         guard scrollingCaptureSession == nil else { return }
+        scrollingCaptureScaleFactor = region.scaleFactor
         isScreenshotCaptureInProgress = true
         isStoppingScrollingCapture = false
         AccessibilityAnnouncementService.shared.announce(
@@ -690,6 +692,7 @@ class CaptureManager: ObservableObject {
         shouldReturnToPicker: Bool
     ) {
         guard scrollingCaptureSession === session else { return }
+        let imageScaleFactor = scrollingCaptureScaleFactor
         if let panel = scrollingCapturePanel {
             scrollingCapturePanelPosition = panel.frame.origin
         }
@@ -697,6 +700,7 @@ class CaptureManager: ObservableObject {
         scrollingCapturePanel = nil
         dismissRegionIndicator()
         scrollingCaptureSession = nil
+        scrollingCaptureScaleFactor = 1
         isStoppingScrollingCapture = false
         isScreenshotCaptureInProgress = false
 
@@ -730,11 +734,17 @@ class CaptureManager: ObservableObject {
                 let outputURL = shouldSaveImmediately
                     ? SaveService.shared.generateURL(for: .screenshot)
                     : TinyClipsTemporaryFiles.makeURL(fileExtension: settings.imageFormat.rawValue)
-                let url = try ScreenshotCapture.saveImage(image, to: outputURL)
+                let url = try ScreenshotCapture.saveImage(
+                    image,
+                    to: outputURL,
+                    scaleFactor: imageScaleFactor
+                )
                 CaptureAnalyticsStore.shared.recordCapture(.screenshot)
                 if settings.showScreenshotEditor {
                     if shouldSaveImmediately {
                         SaveService.shared.handleSavedFile(url: url, type: .screenshot)
+                    } else {
+                        SaveService.shared.copyToClipboardIfEnabled(url: url, type: .screenshot)
                     }
                     let initialSaveURL = shouldSaveImmediately
                         ? url
@@ -799,6 +809,8 @@ class CaptureManager: ObservableObject {
                     if settings.showScreenshotEditor {
                         if shouldSaveImmediately {
                             SaveService.shared.handleSavedFile(url: url, type: .screenshot)
+                        } else {
+                            SaveService.shared.copyToClipboardIfEnabled(url: url, type: .screenshot)
                         }
                         let initialSaveURL = shouldSaveImmediately
                             ? url

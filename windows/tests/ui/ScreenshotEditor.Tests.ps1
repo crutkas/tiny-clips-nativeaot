@@ -180,6 +180,21 @@ Test-UI "Add unsaved annotation to first editor" {
     winapp ui wait-for "TextDialogEntry" -a $AppPid --gone -t 5000
 }
 
+Test-UI "Alt+F4 dismisses the background picker before discard confirmation" {
+    Invoke-UI invoke "EditorBgStyleCombo" @firstTarget
+    Invoke-UI send-keys "down" @firstTarget --via send-input
+    Invoke-UI send-keys "enter" @firstTarget --via send-input
+    Invoke-UI wait-for "EditorCustomSolidBgColorButton" @firstTarget -t 3000 | Out-Null
+    Invoke-UI invoke "EditorCustomSolidBgColorButton" @firstTarget
+    Invoke-UI wait-for "EditorBackgroundColorDialog" @firstTarget -t 3000 | Out-Null
+    Invoke-UI send-keys "alt+f4" @firstTarget --via send-input --allow-system-keys
+    Invoke-UI wait-for "EditorBackgroundColorDialog" @firstTarget --gone -t 3000 | Out-Null
+    Invoke-UI wait-for "EditorCloseConfirmationDialog" @firstTarget -t 5000 | Out-Null
+    Invoke-UI invoke "Cancel" @firstTarget
+    Invoke-UI wait-for "EditorCloseConfirmationDialog" @firstTarget --gone -t 3000 | Out-Null
+    Invoke-UI wait-for "ScreenshotEditorTitleBar" @firstTarget -t 3000 | Out-Null
+}
+
 Test-UI "Start second screenshot capture" {
     winapp ui send-keys "ctrl+shift+5" -a $AppPid --via send-input
 }

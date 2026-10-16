@@ -1,7 +1,9 @@
 # Tiny Clips Studio launch video
 
-An additive, independent snapshot of the Tiny Clips 2.0 Studio launch cut. It lives in
-`marketing/studio-launch/`; the existing `marketing/hype-video/` project remains unchanged.
+An independent snapshot of the Tiny Clips 2.0 Studio launch cut. It lives in
+`marketing/studio-launch/` and includes its own rendering scripts and footage.
+The reusable launch-video tooling and Hype Video skill now live in the standalone
+[tiny-clips-marketing repository](https://github.com/jamesmontemagno/tiny-clips-marketing).
 
 A 45-second, 1920×1080, 60 fps promo for Tiny Clips. The Studio 2.0 cut combines an animated
 HTML/CSS composition with user-supplied Studio footage, rendered frame by frame in a headless
@@ -17,7 +19,7 @@ npm run review     # contact sheets in out/review/, and a check that every tile'
 npm run render     # out/tiny-clips-studio-launch.mp4
 ```
 
-The `hype-video` skill (`../../.github/skills/hype-video/SKILL.md`) walks through the whole flow,
+The `hype-video` skill in the standalone marketing repository walks through the whole flow,
 including a short creative brief, choosing features from the changelogs, and drafting the post.
 
 ## Render it

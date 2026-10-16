@@ -54,8 +54,8 @@ A native **WinUI 3 / Windows App SDK** port of Tiny Clips — a tray-based scree
   data folder; the files themselves are never modified.
 - **Global hotkeys** — Screenshot `Ctrl+Shift+5`, Video `Ctrl+Shift+6`, GIF `Ctrl+Shift+7`,
   Stop recording `Ctrl+Shift+S`. The Video hotkey always makes an ordinary recording; Studio
-  recording has no hotkey. Optional direct Screenshot region, screen, and window shortcuts can be
-  set in Settings → Keyboard shortcuts; they are unbound by default.
+  recording has no hotkey. Optional Recognize Text (OCR) and direct Screenshot region, screen,
+  and window shortcuts can be set in Settings → Keyboard shortcuts; they are unbound by default.
 - **Launch at login** — optionally start TinyClips when you sign in to Windows.
 - **Pre-capture countdown** and **save toast notifications** (both opt-in via Settings).
 - **System-tray** Fluent menu (rounded/acrylic), light/dark/system theming, full **Settings** window.

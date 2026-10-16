@@ -3,6 +3,27 @@ import SwiftUI
 
 let textSystemFontFamily = "System"
 
+enum ScreenshotGradientMath {
+    /// Returns frame-relative endpoints whose axis matches the requested angle in the frame's
+    /// pixel space and whose projection spans every frame corner.
+    static func endpoints(degrees: Double, width: Double, height: Double) -> (start: UnitPoint, end: UnitPoint) {
+        let safeWidth = width.isFinite && width > 0 ? width : 1
+        let safeHeight = height.isFinite && height > 0 ? height : 1
+        let normalizedDegrees = degrees.truncatingRemainder(dividingBy: 360)
+        let radians = normalizedDegrees * .pi / 180
+        let directionX = cos(radians)
+        let directionY = sin(radians)
+        let halfLength = (abs(directionX) * safeWidth + abs(directionY) * safeHeight) / 2
+        let offsetX = directionX * halfLength / safeWidth
+        let offsetY = directionY * halfLength / safeHeight
+
+        return (
+            UnitPoint(x: CGFloat(0.5 - offsetX), y: CGFloat(0.5 - offsetY)),
+            UnitPoint(x: CGFloat(0.5 + offsetX), y: CGFloat(0.5 + offsetY))
+        )
+    }
+}
+
 enum TextBoxPreset: String, CaseIterable, Identifiable {
     case plain
     case light

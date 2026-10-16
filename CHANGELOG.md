@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v1.9.0-mac - 2026-10-16
+
+### Added
+- macOS Screenshot settings now offer an opt-in **Advanced > Exclude ClickLight overlays** option to keep ClickLight rings and other overlays out of region, screen, and scrolling screenshots without adding a delay or configuring ClickLight shortcuts. Video and GIF recordings are unchanged.
+
+## v1.8.4-mac - 2026-10-15
+
+### Fixed
+- macOS screenshots now copy to the clipboard when **Save immediately** is disabled and the screenshot editor is open.
+
+### Added
+- The macOS screenshot editor now lets you set gradient backgrounds to any direction from 0° to 360°, with the preview and exported image staying in sync. (#463)
+
+### Fixed
+- macOS screenshots copied to the clipboard now preserve the capture display's pixel density, so Retina captures paste at their logical size instead of appearing twice as large.
+- macOS Settings > Shortcuts now has a **Clear** button to unassign a shortcut without resetting it to its default. (#450)
+- macOS GitHub releases and Sparkle update notes now use the matching changelog section instead of falling back to commit messages. Older release descriptions can be repaired with the manual **Backfill macOS release notes** workflow, without rebuilding or replacing downloads; preview with **Dry run** before applying.
+
+### Changed
+- Only the **Screenshot**, **Record Video**, and **Record GIF** global shortcuts are assigned by default on macOS. **Copy Text from Region**, **Screenshot Region**, **Screenshot Window**, and **Screenshot Screen** now start unassigned and can be set in Settings > Shortcuts. (#451)
+
+## v1.8.3-mac - 2026-10-13
+
 ### Added
 - A once-per-content-revision **What's New** window introduces Tiny Clips Studio with a screen-and-camera illustration, editing highlights, and a saved preview toggle. Existing users see it once; new installations keep the onboarding tour instead. Enabling Studio leaves ordinary video recording unchanged.
 - The macOS screenshot editor Text tool now includes Plain, Light, Dark, and Accent text-box styles plus custom background, border, padding, and corner controls. Styles apply to the selected text or the next text annotation and reset with each editor window. (#435)

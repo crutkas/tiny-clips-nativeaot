@@ -182,6 +182,8 @@ internal sealed class EditorController : IDisposable
 
     public Color BgColor2 { get; private set; } = Color.FromArgb(255, 214, 230, 252);
 
+    public double GradientDirectionDegrees { get; private set; } = 45;
+
     public double CanvasPadding { get; private set; }
 
     public double CanvasCornerRadius { get; private set; }
@@ -837,6 +839,30 @@ internal sealed class EditorController : IDisposable
             MarkDirty();
             BackgroundChanged?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    public void SetCustomBgColor2(Color color)
+    {
+        if (BgColor2 == color) return;
+        BgColor2 = color;
+        if (BgStyle == ExportBackgroundStyle.Gradient)
+        {
+            MarkDirty();
+            BackgroundChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public void SetGradientDirectionDegrees(double degrees)
+    {
+        if (!double.IsFinite(degrees) || degrees is < 0 or > 360)
+        {
+            throw new ArgumentOutOfRangeException(nameof(degrees));
+        }
+        if (GradientDirectionDegrees == degrees) return;
+
+        GradientDirectionDegrees = degrees;
+        MarkDirty();
+        BackgroundChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void ApplyCustomSolidBackground(Color color)
@@ -1590,7 +1616,14 @@ internal sealed class EditorController : IDisposable
                 ExportFramePreset.Original, ExportHorizontalAlignment.Center, ExportVerticalAlignment.Center);
         var state = new ScreenshotRenderState(
             _annotations.Select(ann => ann.CaptureSnapshot()).ToImmutableArray(),
-            frame, BgStyle, BgColor, BgColor2, CanvasCornerRadius, CanvasShadow, includeBackground,
+            frame,
+            BgStyle,
+            BgColor,
+            BgColor2,
+            GradientDirectionDegrees,
+            CanvasCornerRadius,
+            CanvasShadow,
+            includeBackground,
             ScreenshotExportSize.Create(frame.FrameSize, scalePercent));
         return new EditorRenderSnapshot(_imageOwner.Acquire(), state, _revision.Current, _documentCancellation.Token);
     }
@@ -1636,10 +1669,11 @@ internal sealed class EditorController : IDisposable
             }
             else if (state.IncludeBackground && state.BackgroundStyle == ExportBackgroundStyle.Gradient)
             {
+                var endpoints = ScreenshotGradientMath.Endpoints(state.GradientDirectionDegrees, outW, outH);
                 using var brush = new CanvasLinearGradientBrush(device, state.BackgroundColor, state.BackgroundColor2)
                 {
-                    StartPoint = new Vector2(0, 0),
-                    EndPoint = new Vector2(outW, outH),
+                    StartPoint = new Vector2((float)(endpoints.Start.X * outW), (float)(endpoints.Start.Y * outH)),
+                    EndPoint = new Vector2((float)(endpoints.End.X * outW), (float)(endpoints.End.Y * outH)),
                 };
                 ds.FillRectangle(fullRect, brush);
             }

@@ -66,6 +66,7 @@ class ScreenshotEditorViewModel: ObservableObject {
     @Published var backgroundStyle: ExportBackgroundStyle = .transparent
     @Published var backgroundColor: Color = Color(red: 0.96, green: 0.96, blue: 0.98)
     @Published var backgroundSecondaryColor: Color = Color(red: 0.84, green: 0.90, blue: 0.99)
+    @Published var gradientDirectionDegrees: Double = 45
     @Published var selectedBackgroundPresetID: String = "transparent"
     @Published var wallpaperImage: NSImage?
     @Published var canvasPadding: CGFloat = 0
@@ -77,6 +78,7 @@ class ScreenshotEditorViewModel: ObservableObject {
 
     private var pencilPoints: [CGPoint] = []
     private var imagePixelSize: CGSize = .zero
+    private var sourcePixelScale: CGFloat = 1
     private var dragOffset: CGPoint = .zero
     private var dragOriginalRect: CGRect = .zero
     private var dragOriginalAnnotationRect: CGRect = .zero
@@ -100,6 +102,7 @@ class ScreenshotEditorViewModel: ObservableObject {
     private var initialBackgroundStyle: ExportBackgroundStyle
     private var initialBackgroundColor: Color
     private var initialBackgroundSecondaryColor: Color
+    private var initialGradientDirectionDegrees: Double
     private var initialSelectedBackgroundPresetID: String
     private var initialWallpaperPresent: Bool
     private var initialCanvasPadding: CGFloat
@@ -116,8 +119,9 @@ class ScreenshotEditorViewModel: ObservableObject {
         self.saveFormat = settings.imageFormat
         self.saveScale = settings.screenshotScale
         self.saveJpegQuality = settings.jpegQuality
-        if let image = NSImage(contentsOf: url) {
+        if let image = ImagePixelDensity.loadImage(contentsOf: url) {
             self.originalImage = image
+            self.sourcePixelScale = ImagePixelDensity.scaleFactor(for: image)
             if let rep = image.representations.first {
                 self.imagePixelSize = CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
             }
@@ -126,6 +130,7 @@ class ScreenshotEditorViewModel: ObservableObject {
         self.initialBackgroundStyle = .transparent
         self.initialBackgroundColor = Color(red: 0.96, green: 0.96, blue: 0.98)
         self.initialBackgroundSecondaryColor = Color(red: 0.84, green: 0.90, blue: 0.99)
+        self.initialGradientDirectionDegrees = 45
         self.initialSelectedBackgroundPresetID = "transparent"
         self.initialWallpaperPresent = false
         self.initialCanvasPadding = 0
@@ -571,6 +576,11 @@ class ScreenshotEditorViewModel: ObservableObject {
         }
 
         if !colorsEqual(backgroundColor, initialBackgroundColor) || !colorsEqual(backgroundSecondaryColor, initialBackgroundSecondaryColor) {
+            return true
+        }
+
+        if backgroundStyle == .gradient &&
+            abs(gradientDirectionDegrees - initialGradientDirectionDegrees) > 0.0001 {
             return true
         }
 
@@ -1288,8 +1298,13 @@ class ScreenshotEditorViewModel: ObservableObject {
         recordHistory()
 
         let croppedImage = NSImage(
-            size: NSSize(width: flattenedCrop.pixelsWide, height: flattenedCrop.pixelsHigh)
+            size: ImagePixelDensity.logicalSize(
+                pixelWidth: flattenedCrop.pixelsWide,
+                pixelHeight: flattenedCrop.pixelsHigh,
+                scaleFactor: sourcePixelScale
+            )
         )
+        flattenedCrop.size = croppedImage.size
         croppedImage.addRepresentation(flattenedCrop)
         originalImage = croppedImage
         imagePixelSize = CGSize(width: flattenedCrop.pixelsWide, height: flattenedCrop.pixelsHigh)
@@ -1402,9 +1417,9 @@ class ScreenshotEditorViewModel: ObservableObject {
     func copyToClipboard() {
         guard let output = buildOutputImage() else { return }
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.writeObjects([output.image])
+        if !SaveService.shared.copyImageToClipboard(output.image) {
+            SaveService.shared.showError("Could not copy the edited image to the clipboard.")
+        }
     }
 
     func save(to destinationURL: URL? = nil) -> URL? {
@@ -1430,6 +1445,7 @@ class ScreenshotEditorViewModel: ObservableObject {
         initialBackgroundStyle = backgroundStyle
         initialBackgroundColor = backgroundColor
         initialBackgroundSecondaryColor = backgroundSecondaryColor
+        initialGradientDirectionDegrees = gradientDirectionDegrees
         initialSelectedBackgroundPresetID = selectedBackgroundPresetID
         initialWallpaperPresent = wallpaperImage != nil
         initialCanvasPadding = canvasPadding
@@ -1509,6 +1525,12 @@ class ScreenshotEditorViewModel: ObservableObject {
         guard let renderedBitmap = renderFinalImage() else { return nil }
 
         let outputBitmap = scaleBitmap(renderedBitmap, to: saveScale)
+        let outputScaleFactor = sourcePixelScale * CGFloat(saveScale) / 100
+        outputBitmap.size = ImagePixelDensity.logicalSize(
+            pixelWidth: outputBitmap.pixelsWide,
+            pixelHeight: outputBitmap.pixelsHigh,
+            scaleFactor: outputScaleFactor
+        )
 
         let imageData: Data?
         switch saveFormat {
@@ -1517,12 +1539,18 @@ class ScreenshotEditorViewModel: ObservableObject {
         case .jpeg:
             imageData = outputBitmap.representation(using: .jpeg, properties: [.compressionFactor: saveJpegQuality])
         case .webp:
-            imageData = outputBitmap.cgImage.flatMap { WebPImageEncoder.encode($0, quality: saveJpegQuality) }
+            imageData = outputBitmap.cgImage.flatMap {
+                WebPImageEncoder.encode(
+                    $0,
+                    quality: saveJpegQuality,
+                    scaleFactor: outputScaleFactor
+                )
+            }
         }
 
         guard let data = imageData else { return nil }
 
-        let outputImage = NSImage(size: NSSize(width: outputBitmap.pixelsWide, height: outputBitmap.pixelsHigh))
+        let outputImage = NSImage(size: outputBitmap.size)
         outputImage.addRepresentation(outputBitmap)
 
         return (outputImage, data)
@@ -1825,7 +1853,25 @@ class ScreenshotEditorViewModel: ObservableObject {
                 let colors = [NSColor(backgroundColor).cgColor, NSColor(backgroundSecondaryColor).cgColor] as CFArray
                 let colorSpace = CGColorSpaceCreateDeviceRGB()
                 if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0, 1]) {
-                    context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: outputH), end: CGPoint(x: outputW, y: 0), options: [])
+                    let endpoints = ScreenshotGradientMath.endpoints(
+                        degrees: gradientDirectionDegrees,
+                        width: Double(outputW),
+                        height: Double(outputH)
+                    )
+                    let start = CGPoint(
+                        x: endpoints.start.x * CGFloat(outputW),
+                        y: (1 - endpoints.start.y) * CGFloat(outputH)
+                    )
+                    let end = CGPoint(
+                        x: endpoints.end.x * CGFloat(outputW),
+                        y: (1 - endpoints.end.y) * CGFloat(outputH)
+                    )
+                    context.drawLinearGradient(
+                        gradient,
+                        start: start,
+                        end: end,
+                        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+                    )
                 }
             } else if backgroundStyle == .wallpaper,
                       let wallpaperImage,

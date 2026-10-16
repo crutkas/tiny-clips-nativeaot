@@ -61,7 +61,7 @@ struct ScreenshotSettingsSection: View {
                 .disabled(!settings.showScreenshotEditor)
 
             Toggle("Copy to clipboard", isOn: $settings.copyScreenshotToClipboard)
-                .help("Copy saved screenshots to the clipboard as an image.")
+                .help("Copy screenshots to the clipboard as an image, even before saving in the editor.")
         }
 
         Section("Countdown") {
@@ -81,6 +81,17 @@ struct ScreenshotSettingsSection: View {
                 }
                 .help("Set the countdown duration in seconds.")
             }
+        }
+
+        Section("Advanced") {
+            Toggle("Exclude ClickLight overlays", isOn: $settings.excludeClickLightFromScreenshots)
+                .help("Exclude ClickLight from region, screen, and scrolling screenshots without adding a delay. Video and GIF recordings are unchanged.")
+                .accessibilityLabel("Exclude ClickLight overlays")
+                .accessibilityHint("Hides ClickLight overlays in screenshots only. Does not change video or GIF recordings.")
+
+            Text("Keeps ClickLight rings and other ClickLight overlays out of screenshots. Window captures already include only the selected window. No ClickLight shortcut setup is required.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

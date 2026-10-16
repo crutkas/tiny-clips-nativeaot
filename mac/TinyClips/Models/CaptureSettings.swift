@@ -64,17 +64,18 @@ struct CaptureRegion: Sendable {
         return config
     }
 
-    func makeFilter(alwaysExcluding windows: [SCWindow] = []) async throws -> SCContentFilter {
+    func makeFilter(
+        excludingApplicationBundleIdentifiers bundleIdentifiers: Set<String> = [],
+        alwaysExcluding windows: [SCWindow] = []
+    ) async throws -> SCContentFilter {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == self.displayID }) else {
             throw CaptureError.displayNotFound
         }
         let includeTinyClips = CaptureSettings.shared.includeTinyClipsInCapture
-        if includeTinyClips {
-            return SCContentFilter(display: display, excludingWindows: windows)
-        }
         let excludedApps: [SCRunningApplication] = content.applications.filter {
-            $0.bundleIdentifier == Bundle.main.bundleIdentifier
+            (!includeTinyClips && $0.bundleIdentifier == Bundle.main.bundleIdentifier)
+                || bundleIdentifiers.contains($0.bundleIdentifier)
         }
         if excludedApps.isEmpty {
             return SCContentFilter(display: display, excludingWindows: windows)
@@ -476,6 +477,10 @@ class CaptureSettings: ObservableObject {
     }
     @AppStorage("screenshotFormat") var screenshotFormat: String = ImageFormat.jpeg.rawValue
     @AppStorage("screenshotScale") var screenshotScale: Int = 100
+    @AppStorage("excludeClickLightFromScreenshots") var excludeClickLightFromScreenshots: Bool = false
+    var screenshotExcludedApplicationBundleIdentifiers: Set<String> {
+        excludeClickLightFromScreenshots ? ["com.aurorascharff.ClickLight"] : []
+    }
     @AppStorage("jpegQuality") var jpegQuality: Double = 0.85
     @AppStorage("videoCountdownEnabled") var videoCountdownEnabled: Bool = true
     @AppStorage("videoCountdownDuration") var videoCountdownDuration: Int = 3
@@ -496,7 +501,7 @@ class CaptureSettings: ObservableObject {
     @AppStorage("teleprompterFontSize") var teleprompterFontSize: String = TeleprompterDisplaySize.medium.rawValue
     @AppStorage("teleprompterPanelHeight") var teleprompterPanelHeight: String = TeleprompterDisplaySize.medium.rawValue
     // Custom global hotkeys (stored as Carbon keyCode + modifiers bitmask).
-    // Defaults: ⌃⌥⌘5 / ⌃⌥⌘6 / ⌃⌥⌘7 / ⌃⌥⌘8
+    // Defaults: ⌃⌥⌘5 / ⌃⌥⌘6 / ⌃⌥⌘7; every other action is unbound (-1 / 0) by default.
     // 6400 = controlKey (4096) | optionKey (2048) | cmdKey (256)
     @AppStorage("screenshotHotKeyCode") var screenshotHotKeyCode: Int = 23      // kVK_ANSI_5
     @AppStorage("screenshotHotKeyModifiers") var screenshotHotKeyModifiers: Int = 6400
@@ -504,13 +509,13 @@ class CaptureSettings: ObservableObject {
     @AppStorage("videoHotKeyModifiers") var videoHotKeyModifiers: Int = 6400
     @AppStorage("gifHotKeyCode") var gifHotKeyCode: Int = 26                    // kVK_ANSI_7
     @AppStorage("gifHotKeyModifiers") var gifHotKeyModifiers: Int = 6400
-    @AppStorage("copyTextFromRegionHotKeyCode") var copyTextFromRegionHotKeyCode: Int = 28 // kVK_ANSI_8
-    @AppStorage("copyTextFromRegionHotKeyModifiers") var copyTextFromRegionHotKeyModifiers: Int = 6400
-    // Direct-to-mode screenshot shortcuts (skip the capture picker); screen is unbound by default.
-    @AppStorage("screenshotRegionHotKeyCode") var screenshotRegionHotKeyCode: Int = 18 // kVK_ANSI_1
-    @AppStorage("screenshotRegionHotKeyModifiers") var screenshotRegionHotKeyModifiers: Int = 6400
-    @AppStorage("screenshotWindowHotKeyCode") var screenshotWindowHotKeyCode: Int = 19 // kVK_ANSI_2
-    @AppStorage("screenshotWindowHotKeyModifiers") var screenshotWindowHotKeyModifiers: Int = 6400
+    @AppStorage("copyTextFromRegionHotKeyCode") var copyTextFromRegionHotKeyCode: Int = -1
+    @AppStorage("copyTextFromRegionHotKeyModifiers") var copyTextFromRegionHotKeyModifiers: Int = 0
+    // Direct-to-mode screenshot shortcuts (skip the capture picker); all unbound by default.
+    @AppStorage("screenshotRegionHotKeyCode") var screenshotRegionHotKeyCode: Int = -1
+    @AppStorage("screenshotRegionHotKeyModifiers") var screenshotRegionHotKeyModifiers: Int = 0
+    @AppStorage("screenshotWindowHotKeyCode") var screenshotWindowHotKeyCode: Int = -1
+    @AppStorage("screenshotWindowHotKeyModifiers") var screenshotWindowHotKeyModifiers: Int = 0
     @AppStorage("screenshotScreenHotKeyCode") var screenshotScreenHotKeyCode: Int = -1
     @AppStorage("screenshotScreenHotKeyModifiers") var screenshotScreenHotKeyModifiers: Int = 0
 
@@ -630,7 +635,7 @@ class CaptureSettings: ObservableObject {
         let keyCode = defaults.object(forKey: keys.keyCode) as? Int ?? fallback.keyCode
         let carbonModifiers = defaults.object(forKey: keys.modifiers) as? Int ?? fallback.carbonModifiers
 
-        if action == .screenshotScreen, keyCode == 0, carbonModifiers == 0 {
+        if fallback.isUnbound, keyCode == 0, carbonModifiers == 0 {
             return fallback
         }
 
@@ -843,7 +848,7 @@ class CaptureSettings: ObservableObject {
         "showScreenshotCapturePicker", "showScreenshotCapturePickerAfterCapture",
         "showVideoCapturePicker", "showVideoCapturePickerAfterCapture",
         "showGifCapturePicker", "showGifCapturePickerAfterCapture",
-        "screenshotFormat", "screenshotScale", "jpegQuality",
+        "screenshotFormat", "screenshotScale", "excludeClickLightFromScreenshots", "jpegQuality",
         "videoCountdownEnabled", "videoCountdownDuration",
         "videoRecordingTimeLimitMinutes",
         "gifCountdownEnabled", "gifCountdownDuration",
@@ -879,6 +884,11 @@ class CaptureSettings: ObservableObject {
 
     init(defaults: UserDefaults = .standard, performMigrations: Bool = true) {
         self.defaults = defaults
+        _excludeClickLightFromScreenshots = AppStorage(
+            wrappedValue: false,
+            "excludeClickLightFromScreenshots",
+            store: defaults
+        )
         audioOffsetMs = audioOffsetMs
         guard performMigrations else { return }
 
