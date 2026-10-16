@@ -11,24 +11,24 @@
         <item>
             
             
-            <title>1.8.4</title>
+            <title>1.9.0</title>
             
             
-            <pubDate>Fri, 16 Oct 2026 00:13:13 +0000</pubDate>
+            <pubDate>Fri, 16 Oct 2026 17:05:07 +0000</pubDate>
             
             
-            <sparkle:version>63</sparkle:version>
+            <sparkle:version>64</sparkle:version>
             
             
-            <sparkle:shortVersionString>1.8.4</sparkle:shortVersionString>
+            <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
             
             
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             
             
-            <description><![CDATA[<h3>Fixed</h3><ul><li>macOS screenshots now copy to the clipboard when **Save immediately** is disabled and the screenshot editor is open.</li></ul><h3>Added</h3><ul><li>The macOS screenshot editor now lets you set gradient backgrounds to any direction from 0° to 360°, with the preview and exported image staying in sync. (#463)</li></ul><h3>Fixed</h3><ul><li>macOS screenshots copied to the clipboard now preserve the capture display&#x27;s pixel density, so Retina captures paste at their logical size instead of appearing twice as large.</li><li>macOS Settings &gt; Shortcuts now has a **Clear** button to unassign a shortcut without resetting it to its default. (#450)</li><li>macOS GitHub releases and Sparkle update notes now use the matching changelog section instead of falling back to commit messages. Older release descriptions can be repaired with the manual **Backfill macOS release notes** workflow, without rebuilding or replacing downloads; preview with **Dry run** before applying.</li></ul><h3>Changed</h3><ul><li>Only the **Screenshot**, **Record Video**, and **Record GIF** global shortcuts are assigned by default on macOS. **Copy Text from Region**, **Screenshot Region**, **Screenshot Window**, and **Screenshot Screen** now start unassigned and can be set in Settings &gt; Shortcuts. (#451)</li></ul><p><a href="https://github.com/jamesmontemagno/tiny-clips/compare/v1.8.3-mac...v1.8.4-mac">Full Changelog</a></p>]]></description>
-            <sparkle:releaseNotesLink>https://github.com/jamesmontemagno/tiny-clips/releases/tag/v1.8.4-mac</sparkle:releaseNotesLink>
-            <enclosure url="https://github.com/jamesmontemagno/tiny-clips/releases/download/v1.8.4-mac/TinyClips-v1.8.4-mac.zip" length="4859827" type="application/octet-stream" sparkle:edSignature="XIWyxHwzJ78vEsHQbTz7SDkfJ1qBI02wgI/N/iqqNLUbiz0mITfKAqi+4ETdSWjcx8CNQL+lIghPrxZ0qqqhBg=="/>
+            <description><![CDATA[<h3>Added</h3><ul><li>macOS Screenshot settings now offer an opt-in **Advanced &gt; Exclude ClickLight overlays** option to keep ClickLight rings and other overlays out of region, screen, and scrolling screenshots without adding a delay or configuring ClickLight shortcuts. Video and GIF recordings are unchanged.</li></ul><p><a href="https://github.com/jamesmontemagno/tiny-clips/compare/v1.8.4-mac...v1.9.0-mac">Full Changelog</a></p>]]></description>
+            <sparkle:releaseNotesLink>https://github.com/jamesmontemagno/tiny-clips/releases/tag/v1.9.0-mac</sparkle:releaseNotesLink>
+            <enclosure url="https://github.com/jamesmontemagno/tiny-clips/releases/download/v1.9.0-mac/TinyClips-v1.9.0-mac.zip" length="4863438" type="application/octet-stream" sparkle:edSignature="2jxZTcsJKm+vF2ey+P7rDZbi4ReAQIGhfHTYxJTL/GEJY0XEJ89WVhzvHP1RRDhmdONPwjWvpsu//QpCKsseCQ=="/>
             
         
         </item>
