@@ -54,6 +54,7 @@ public sealed partial class ScreenshotEditorWindow : Window
     private bool _hasPendingCropSelection;
     private bool _closeConfirmed;
     private bool _isClosePromptOpen;
+    private bool _isAppWindowCloseHandling;
     private bool _isDeletingSource;
     private bool _isClosed;
     private int _outputScalePercent = 100;
@@ -203,17 +204,35 @@ public sealed partial class ScreenshotEditorWindow : Window
     /// </summary>
     private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_closeConfirmed || !HasUnsavedChanges)
+        var hasOpenBackgroundColorDialog = Inspector.HasOpenBackgroundColorDialog;
+        if (_closeConfirmed || (!hasOpenBackgroundColorDialog && !HasUnsavedChanges))
         {
             return;
         }
 
         args.Cancel = true;
-
-        if (await ShowDiscardChangesDialogAsync())
+        if (_isAppWindowCloseHandling)
         {
-            _closeConfirmed = true;
-            Close();
+            return;
+        }
+
+        _isAppWindowCloseHandling = true;
+        try
+        {
+            if (hasOpenBackgroundColorDialog)
+            {
+                await Inspector.DismissBackgroundColorDialogAsync();
+            }
+
+            if (!HasUnsavedChanges || await ShowDiscardChangesDialogAsync())
+            {
+                _closeConfirmed = true;
+                Close();
+            }
+        }
+        finally
+        {
+            _isAppWindowCloseHandling = false;
         }
     }
 

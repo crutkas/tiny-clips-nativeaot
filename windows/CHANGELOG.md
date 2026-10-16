@@ -7,6 +7,7 @@ own `CHANGELOG.md` at the repository root.
 
 ### Added
 - **Gradient direction** — choose any direction from 0° to 360° for screenshot-editor gradient backgrounds; the preview and exported image stay in sync. (#463)
+- **Custom gradient colors** — choose independent custom colors for both ends of a screenshot-editor gradient.
 
 ### Changed
 - **Capture picker parity** — Text recognition remains available from the tray and a configurable global
@@ -18,6 +19,11 @@ own `CHANGELOG.md` at the repository root.
   image load. File access or captured-frame copying starts from a low-priority UI-thread callback
   after activation, while close/reset race protection and image-loading behavior remain unchanged.
   This removes demonstrated constructor work without claiming unmeasured native latency gains. (#409)
+
+### Fixed
+- Screenshot-editor background preset captions now match the selected style, and custom color
+  selection opens in a native WinUI picker dialog instead of being clipped inside the inspector.
+  The picker follows the editor's current theme and closes before any discard confirmation appears.
 
 ## [v1.8.3-windows] - 2026-10-12
 
