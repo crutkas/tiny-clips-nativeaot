@@ -437,6 +437,170 @@ final class StudioProjectFolderTests: XCTestCase {
         XCTAssertTrue(RecentMenuEntry.merged(captures: captures, drafts: drafts, limit: 0).isEmpty)
     }
 
+    func testCaseVariantsOfTheDestinationRecordCannotReplaceOrExposeAnAsset() throws {
+        for name in ["saved-project.json", "Saved-Project.json", "SAVED-PROJECT.JSON"] {
+            let id = try makeProject(camera: false)
+            var project = try store.load(id: id)
+            project.canvas.background.image = name
+            try store.save(project)
+            let asset = try store.paths(forID: id).projectDirectory.appendingPathComponent(name)
+            let original = Data("project asset".utf8)
+            try original.write(to: asset)
+            let file = outsideURL.appendingPathComponent("Saved.tinyclips")
+
+            XCTAssertThrowsError(try store.rememberDestination(id: id, file: file, bookmark: Data("private bookmark".utf8)))
+            XCTAssertThrowsError(try store.savedDestination(id: id))
+            XCTAssertEqual(try Data(contentsOf: asset), original)
+        }
+    }
+
+    func testImportedDestinationSurvivesRestartWithoutTravellingWithTheProject() throws {
+        let id = try makeProject(camera: false)
+        let folder = outsideURL.appendingPathComponent("Original")
+        try store.exportProjectFolder(id: id, to: folder)
+        let file = folder.appendingPathComponent("Original.tinyclips")
+        let imported = try store.importProjectFolder(projectFile: file)
+        let reopenedStore = StudioProjectStore(rootURL: storeURL)
+        XCTAssertEqual(try reopenedStore.savedDestination(id: imported.id)?.file, file)
+        let copy = outsideURL.appendingPathComponent("Copy")
+        try reopenedStore.exportProjectFolder(id: imported.id, to: copy)
+        XCTAssertFalse(fileManager.fileExists(atPath: copy.appendingPathComponent("saved-project.json").path))
+        XCTAssertFalse(try String(contentsOf: copy.appendingPathComponent("Copy.tinyclips"), encoding: .utf8).contains(outsideURL.path))
+    }
+
+    func testLinkedSavePreservesExportedVideosAndOtherContent() throws {
+        let id = try makeProject(camera: true)
+        let folder = outsideURL.appendingPathComponent("Saved")
+        try store.exportProjectFolder(id: id, to: folder)
+        let file = folder.appendingPathComponent("Custom Name.tinyclips")
+        try fileManager.moveItem(at: folder.appendingPathComponent("Saved.tinyclips"), to: file)
+        let imported = try store.importProjectFolder(projectFile: file)
+        try Data("export".utf8).write(to: folder.appendingPathComponent("Demo.mp4"))
+        try Data("notes".utf8).write(to: folder.appendingPathComponent("notes.txt"))
+        let other = folder.appendingPathComponent("Other")
+        try fileManager.createDirectory(at: other, withIntermediateDirectories: false)
+        try Data("keep".utf8).write(to: other.appendingPathComponent("keep.txt"))
+        var edited = imported
+        edited.name = "Updated"
+        try store.save(edited)
+
+        try store.updateSavedProject(id: imported.id, projectFile: file)
+
+        let saved = try StudioJSON.makeDecoder().decode(StudioProject.self, from: Data(contentsOf: file))
+        XCTAssertEqual(saved.name, "Updated")
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("Demo.mp4")), Data("export".utf8))
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("notes.txt")), Data("notes".utf8))
+        XCTAssertEqual(try Data(contentsOf: other.appendingPathComponent("keep.txt")), Data("keep".utf8))
+    }
+
+    func testLinkedSaveDoesNotOverwriteANewAssetCollision() throws {
+        let id = try makeProject(camera: false)
+        let folder = outsideURL.appendingPathComponent("Saved")
+        try store.exportProjectFolder(id: id, to: folder)
+        let file = folder.appendingPathComponent("Saved.tinyclips")
+        let original = try Data(contentsOf: file)
+        let background = folder.appendingPathComponent("background.png")
+        try Data("unrelated".utf8).write(to: background)
+        try Data("new asset".utf8).write(to: try store.paths(forID: id).projectDirectory.appendingPathComponent("background.png"))
+        var edited = try store.load(id: id)
+        edited.canvas.background.image = "background.png"
+        try store.save(edited)
+
+        XCTAssertThrowsError(try store.updateSavedProject(id: id, projectFile: file))
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        XCTAssertEqual(try Data(contentsOf: background), Data("unrelated".utf8))
+    }
+
+    func testLinkedSavePreservesANewAssetThatAppearsAfterPreflightAndRollsBack() throws {
+        let id = try makeProject(camera: false)
+        let folder = outsideURL.appendingPathComponent("Saved")
+        try store.exportProjectFolder(id: id, to: folder)
+        let file = folder.appendingPathComponent("Saved.tinyclips")
+        let original = try Data(contentsOf: file)
+        let background = folder.appendingPathComponent("background.png")
+        try Data("new asset".utf8).write(to: try store.paths(forID: id).projectDirectory.appendingPathComponent("background.png"))
+        var edited = try store.load(id: id)
+        edited.canvas.background.image = "background.png"
+        try store.save(edited)
+
+        XCTAssertThrowsError(try store.updateSavedProject(id: id, projectFile: file, beforeCommit: {
+            try Data("late unrelated file".utf8).write(to: background)
+        }))
+
+        XCTAssertEqual(try Data(contentsOf: background), Data("late unrelated file".utf8))
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("screen.mp4")), Data("screen".utf8))
+        XCTAssertFalse(try names(in: folder).contains { $0.hasPrefix(".tinyclips-update-") })
+    }
+
+    func testInvalidSavedDestinationIsReported() throws {
+        let id = try makeProject(camera: false)
+        let record = try store.paths(forID: id).projectDirectory.appendingPathComponent("saved-project.json")
+        let invalid = StudioProjectStore.SavedDestination(file: outsideURL.appendingPathComponent("video.mp4"))
+        try JSONEncoder().encode(invalid).write(to: record)
+        XCTAssertThrowsError(try store.savedDestination(id: id))
+    }
+
+    func testSaveAsRefusesToReplaceAFolderContainingAnExport() throws {
+        let id = try makeProject(camera: false)
+        let folder = outsideURL.appendingPathComponent("Saved")
+        try store.exportProjectFolder(id: id, to: folder)
+        let exported = folder.appendingPathComponent("Demo.mp4")
+        try Data("export".utf8).write(to: exported)
+        XCTAssertThrowsError(try store.exportProjectFolder(id: id, to: folder, replacingSavedProject: true))
+        XCTAssertEqual(try Data(contentsOf: exported), Data("export".utf8))
+    }
+
+    func testExportDestinationReplacesOnlyTheApprovedFile() throws {
+        let output = outsideURL.appendingPathComponent("Chosen.mp4")
+        let staged = outsideURL.appendingPathComponent("staged.mp4")
+        try Data("old".utf8).write(to: output)
+        let target = try StudioExportDestination(url: output)
+        try Data("rendered".utf8).write(to: staged)
+        try target.commit(staged: staged)
+        XCTAssertEqual(try Data(contentsOf: output), Data("rendered".utf8))
+        XCTAssertFalse(fileManager.fileExists(atPath: staged.path))
+    }
+
+    func testExportDestinationDoesNotReplaceAFileThatAppearsWhileRendering() throws {
+        let output = outsideURL.appendingPathComponent("Chosen.mp4")
+        let staged = outsideURL.appendingPathComponent("staged.mp4")
+        let target = try StudioExportDestination(url: output)
+        try Data("another file".utf8).write(to: output)
+        try Data("rendered".utf8).write(to: staged)
+        XCTAssertThrowsError(try target.commit(staged: staged))
+        XCTAssertEqual(try Data(contentsOf: output), Data("another file".utf8))
+    }
+
+    func testMatchingSizeAndTimestampDoNotAuthorizeAReplacementOrInPlaceEdit() throws {
+        for inPlace in [false, true] {
+            let output = outsideURL.appendingPathComponent(inPlace ? "InPlace.mp4" : "Replaced.mp4")
+            let staged = outsideURL.appendingPathComponent(inPlace ? "InPlace-staged.mp4" : "Replaced-staged.mp4")
+            let modified = Date(timeIntervalSince1970: 1_700_000_000)
+            try Data("first!".utf8).write(to: output)
+            try fileManager.setAttributes([.modificationDate: modified], ofItemAtPath: output.path)
+            let target = try StudioExportDestination(url: output)
+            if inPlace {
+                let handle = try FileHandle(forWritingTo: output)
+                try handle.write(contentsOf: Data("other!".utf8))
+                try handle.close()
+            } else {
+                try fileManager.moveItem(at: output, to: outsideURL.appendingPathComponent("Previous.mp4"))
+                try Data("other!".utf8).write(to: output)
+            }
+            try fileManager.setAttributes([.modificationDate: modified], ofItemAtPath: output.path)
+            let changed = try StudioExportDestination(url: output)
+            XCTAssertEqual(target.size, changed.size)
+            XCTAssertEqual(target.modified, changed.modified)
+            try Data("rendered".utf8).write(to: staged)
+
+            XCTAssertThrowsError(try target.commit(staged: staged))
+
+            XCTAssertEqual(try Data(contentsOf: output), Data("other!".utf8))
+            XCTAssertEqual(try Data(contentsOf: staged), Data("rendered".utf8))
+        }
+    }
+
     // MARK: - Helpers
 
     private func makeProject(camera: Bool, events: Bool = false, poster: Bool = false) throws -> String {
