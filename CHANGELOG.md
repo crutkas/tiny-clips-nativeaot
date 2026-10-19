@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Studio now remembers each project's saved location across restarts. **Save Project** (Command-S) updates it; **Save Project As...** (Shift-Command-S) chooses a new location. Opening a saved project links explicit Save back to its original folder, while internal autosave stays local.
 - Studio video export now asks for a filename and destination, starting in the saved project folder or the configured video folder. Confirmed overwrites preserve the previous video if rendering fails or is cancelled, and later project saves preserve exported videos in the project folder.
+- Studio save/export safety checks now protect case variants of local metadata filenames, preserve late unrelated asset collisions, and verify the identity and change version of an approved output before replacing it.
 - Set the macOS app version to **2.0.0** for direct and Mac App Store builds.
 
 ## v1.9.0-mac - 2026-10-16

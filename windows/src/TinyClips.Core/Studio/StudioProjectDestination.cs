@@ -46,7 +46,12 @@ public static class StudioProjectDestination
 
     public static void Update(
         IStudioProjectStore store, string id, string file,
-        IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default) =>
+        Update(store, id, file, progress, cancellationToken, beforeCommit: null);
+
+    internal static void Update(
+        IStudioProjectStore store, string id, string file,
+        IProgress<double>? progress, CancellationToken cancellationToken, Action? beforeCommit)
     {
         lock (SaveLock)
         {
@@ -90,11 +95,12 @@ public static class StudioProjectDestination
                 {
                     throw new IOException("The saved project changed while saving. Save again or use Save as.");
                 }
+                beforeCommit?.Invoke();
                 Directory.CreateDirectory(backups);
                 foreach (var name in names)
                 {
                     var destination = Path.Combine(folder, name);
-                    if (File.Exists(destination))
+                    if (owned.Contains(name) && File.Exists(destination))
                     {
                         File.Move(destination, Path.Combine(backups, name));
                         moved.Add(name);

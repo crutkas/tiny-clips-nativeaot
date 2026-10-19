@@ -789,9 +789,9 @@ A project lives in the projects root (section 1), which no one is meant to look 
 
 **Save and Save As.** The folder is a snapshot as of the moment it is saved. The project stays in the projects root and is edited there; internal autosave never writes to the external folder. First Save asks where to put the folder. Subsequent explicit Save updates that same saved project without asking again. Save As asks for a new name/location and makes the successful result the destination for future Save commands.
 
-The association is stored locally as `saved-project.json` inside the internal project folder, keyed implicitly by the internal project id. It records the exact external `.tinyclips` filename and, on sandboxed macOS, a security-scoped folder bookmark. It survives restarting the app, is removed with the internal project, and is never included in a portable snapshot. No portable schema change is required.
+The association is stored locally as `saved-project.json` inside the internal project folder, keyed implicitly by the internal project id. It records the exact external `.tinyclips` filename and, on sandboxed macOS, a security-scoped folder bookmark. This filename is reserved without regard to case: an asset with any case variant prevents reading or writing the local association. It survives restarting the app, is removed with the internal project, and is never included in a portable snapshot. No portable schema change is required.
 
-**Updating a linked saved project.** Save stages project files and commits metadata last, with rollback on failure. Only validated project-owned files may be updated: exported videos, unrelated files, and unrelated subfolders are preserved. New asset names may not overwrite unrelated entries, and links are not followed for writes. A missing or inaccessible target is reported; Save As can select another destination.
+**Updating a linked saved project.** Save stages project files and commits metadata last, with rollback on failure. Only validated project-owned files may be updated: exported videos, unrelated files, and unrelated subfolders are preserved. Only names owned by the previous saved project can be backed up and replaced; late collisions at new asset names fail without replacing the unrelated entry. Links are not followed for writes. A missing or inaccessible target is reported; Save As can select another destination.
 
 **Save As replacement.** Saving to a different existing folder replaces it, with everything in it, only after confirmation and only when all of this holds:
 
@@ -813,6 +813,8 @@ Anything else is left exactly as it is and the Save As replacement is refused. W
 - Opening itself only reads the original folder. The new internal draft remembers its exact source `.tinyclips` file as its saved destination, so a later explicit Save updates that original; internal autosave does not.
 
 **Video export destinations.** Every Studio export command, including Export from the close prompt, asks for an MP4 filename and folder. The default is the folder containing the linked `.tinyclips` file, or the configured video-save folder for an unsaved project. Cancelling the picker starts no render and keeps the editor open. An existing output requires native overwrite confirmation; staged rendering preserves the previous file on failure/cancellation. A late filename collision is reported rather than silently renaming or overwriting without consent. Project data and source recordings cannot be export targets. Export bookkeeping records the actual selected final path only after commit.
+
+Overwrite approval captures native file identity and the filesystem's metadata-change version as well as size and modification time. Replacing a file or editing it in place cannot preserve approval merely by restoring its modification time. Windows resolves ancestor junctions/symbolic links for both selected and protected paths before checking source protection, and tracks the resolved output location through commit.
 
 A `.tinyclips` file larger than 16 MB is refused unread; one a writer wrote is a few kilobytes.
 

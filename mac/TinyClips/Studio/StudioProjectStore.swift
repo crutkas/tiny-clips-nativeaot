@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 // MARK: - Store Types
@@ -684,10 +685,7 @@ final class StudioProjectStore {
     }
 
     func savedDestination(id: String) throws -> SavedDestination? {
-        guard !ownedFiles(try load(id: id)).contains("saved-project.json") else {
-            throw StudioProjectFolderError.destinationExists
-        }
-        let record = try paths(forID: id).projectDirectory.appendingPathComponent("saved-project.json")
+        let record = try destinationRecordURL(id: id)
         guard fileManager.fileExists(atPath: record.path) else { return nil }
         let destination = try JSONDecoder().decode(SavedDestination.self, from: Data(contentsOf: record))
         guard destination.file.isFileURL,
@@ -701,11 +699,17 @@ final class StudioProjectStore {
         guard file.isFileURL, file.pathExtension.lowercased() == Self.projectFileExtension else {
             throw CocoaError(.fileWriteInvalidFileName)
         }
-        guard !ownedFiles(try load(id: id)).contains("saved-project.json") else {
+        let record = try destinationRecordURL(id: id)
+        try JSONEncoder().encode(SavedDestination(file: file, bookmark: bookmark)).write(to: record, options: .atomic)
+    }
+
+    private func destinationRecordURL(id: String) throws -> URL {
+        guard !ownedFiles(try load(id: id)).contains(where: {
+            $0.caseInsensitiveCompare("saved-project.json") == .orderedSame
+        }) else {
             throw StudioProjectFolderError.destinationExists
         }
-        let record = try paths(forID: id).projectDirectory.appendingPathComponent("saved-project.json")
-        try JSONEncoder().encode(SavedDestination(file: file, bookmark: bookmark)).write(to: record, options: .atomic)
+        return try paths(forID: id).projectDirectory.appendingPathComponent("saved-project.json")
     }
 
     private static let linkedSaveLock = NSLock()
@@ -728,7 +732,7 @@ final class StudioProjectStore {
         return values.isRegularFile == true && values.isSymbolicLink != true
     }
 
-    func updateSavedProject(id: String, projectFile: URL) throws {
+    func updateSavedProject(id: String, projectFile: URL, beforeCommit: (() throws -> Void)? = nil) throws {
         Self.linkedSaveLock.lock()
         defer { Self.linkedSaveLock.unlock() }
         let folder = projectFile.deletingLastPathComponent()
@@ -768,10 +772,11 @@ final class StudioProjectStore {
             guard try Data(contentsOf: projectFile) == originalData else {
                 throw StudioProjectFolderError.destinationExists
             }
+            try beforeCommit?()
             try fileManager.createDirectory(at: backups, withIntermediateDirectories: false)
             for name in names {
                 let destination = folder.appendingPathComponent(name)
-                if fileManager.fileExists(atPath: destination.path) {
+                if owned.contains(name) && fileManager.fileExists(atPath: destination.path) {
                     try fileManager.moveItem(at: destination, to: backups.appendingPathComponent(name))
                     moved.append(name)
                 }
@@ -1313,19 +1318,37 @@ struct StudioExportDestination: Equatable {
     let url: URL
     let size: UInt64?
     let modified: Date?
+    private let version: FileVersion?
+
+    private struct FileVersion: Equatable {
+        let device: Int32
+        let inode: UInt64
+        let changedSeconds: Int64
+        let changedNanoseconds: Int64
+    }
 
     init(url: URL) throws {
         self.url = url
         if FileManager.default.fileExists(atPath: url.path) {
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            guard attributes[.type] as? FileAttributeType == .typeRegular else {
+            var info = stat()
+            try url.withUnsafeFileSystemRepresentation { path in
+                guard let path else { throw CocoaError(.fileWriteInvalidFileName) }
+                guard Darwin.lstat(path, &info) == 0 else {
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+                }
+            }
+            guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else {
                 throw CocoaError(.fileWriteInvalidFileName)
             }
-            size = (attributes[.size] as? NSNumber)?.uint64Value
-            modified = attributes[.modificationDate] as? Date
+            size = UInt64(info.st_size)
+            modified = Date(timeIntervalSince1970: Double(info.st_mtimespec.tv_sec)
+                + Double(info.st_mtimespec.tv_nsec) / 1_000_000_000)
+            version = FileVersion(device: info.st_dev, inode: info.st_ino,
+                changedSeconds: Int64(info.st_ctimespec.tv_sec), changedNanoseconds: Int64(info.st_ctimespec.tv_nsec))
         } else {
             size = nil
             modified = nil
+            version = nil
         }
     }
 
