@@ -158,6 +158,33 @@ Run the storage setup's mocked safety checks locally (no real disk operations):
 pwsh -NoProfile -File .github\tests\WindowsArmNvme.Tests.ps1
 ```
 
+##### Initial hosted measurements (2026-10-20)
+
+Both runs used commit `dfb9934a2af3ead03b69ff79e961211ae3a01f75`, `source=build`,
+`asset_version=2.0.0`, `wait_seconds=60`, and .NET SDK `10.0.402`. The only dispatch-input
+difference was `use_local_nvme`.
+
+| ARM64 metric | [Default storage](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39472796355) | [Local NVMe](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39473916727) |
+| --- | --- | --- |
+| Build and package step | 3m41s | 2m39s |
+| Total job, including setup and cleanup, excluding queue | 6m39s | 6m13s |
+| NVMe setup | Skipped | 17s |
+| .NET SDK setup | 3s | 32s |
+| Checkout | 10s | 10s |
+
+Build/package duration was **62s shorter (28%)**, and the whole ARM64 job was **26s shorter
+(6.5%)** in this pair. The enabled run selected a 220 GiB `Microsoft NVMe Direct Disk v2`,
+logged `Build storage: local-nvme`, and confirmed the temporary/NuGet paths on `D:`.
+Both architectures passed package verification, signing, installation, launch, and editor
+single-instance checks in both runs.
+
+This is **one exploratory pair, not an isolated estimate of the storage effect**. GitHub
+assigned different `windows-11-vs2026-arm64` image versions: `20261018.189.1` for default
+storage and `20261013.183.4` for NVMe. The baseline already had the selected SDK/runtime;
+the NVMe run downloaded and installed them, accounting for much of its extra setup time.
+Keep the pilot opt-in and repeat measurements on comparable images/cache states before
+making it a default or claiming a repeatable speedup.
+
 #### Verifying on a real clean machine
 
 On a normal Windows 11 machine, direct MSIX and winget installation should not prompt for or install
