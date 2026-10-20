@@ -1,0 +1,9 @@
+{
+  "format": "tinyclips-team-load-config",
+  "version": 1,
+  "repositories": ["jamesmontemagno/tiny-clips", "jamesmontemagno/tiny-clips-website", "jamesmontemagno/tiny-clips-marketing"],
+  "availableRepositories": ["jamesmontemagno/tiny-clips-mac"],
+  "people": ["jamesmontemagno", "katiesavage", "jukasper", "pierceboggan", "burkeholland", "copilot"],
+  "limit": 6,
+  "refreshSeconds": 300
+}
