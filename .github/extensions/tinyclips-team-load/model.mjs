@@ -46,7 +46,7 @@ export function validateConfig(value) {
 }
 
 const uniq = list => [...new Set(list)];
-export function normalizeTracking(value) {
+export function normalizeTracking(value, { maxPeople = MAX_PEOPLE, maxRepos = MAX_REPOS } = {}) {
     const fail = message => { throw new TeamLoadError("invalid_input", message); };
     if (!value || typeof value !== "object" || Array.isArray(value)) fail("Provide people and repos lists.");
     const extra = Object.keys(value).filter(key => !["people", "repos"].includes(key));
@@ -58,8 +58,8 @@ export function normalizeTracking(value) {
     const seen = new Map();
     for (const repo of value.repos) if (!seen.has(repo.toLowerCase())) seen.set(repo.toLowerCase(), repo);
     const repos = [...seen.values()];
-    if (people.length > MAX_PEOPLE) fail(`Track at most ${MAX_PEOPLE} people.`);
-    if (repos.length > MAX_REPOS) fail(`Track at most ${MAX_REPOS} repositories.`);
+    if (people.length > maxPeople) fail(`Track at most ${maxPeople} people.`);
+    if (repos.length > maxRepos) fail(`Track at most ${maxRepos} repositories.`);
     return { people, repos };
 }
 

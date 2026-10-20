@@ -62,6 +62,7 @@ function compute() {
 const limit = () => S?.limit ?? 6;
 const scale = () => meterScale(people.map(p => p.items.length), limit());
 const repoLoading = () => S && S.tracking.repos.some(r => (S.repoStatus[r]?.status ?? "loading") === "loading");
+const repoPartial = () => !!S && S.tracking.repos.some(r => ["error", "stale"].includes(S.repoStatus[r]?.status));
 
 // ---- Pieces ----
 function avatarHTML(person, size = 32) {
@@ -124,7 +125,8 @@ function renderMeta() {
     const free = humans.filter(p => p.items.length === 0).map(firstName);
     const over = humans.filter(p => p.items.length > limit()).map(firstName);
     const parts = [];
-    if (!repoLoading()) {
+    if (repoPartial()) parts.push(`<span><i class="dot dot-over"></i>Counts may be incomplete</span>`);
+    else if (!repoLoading()) {
         if (free.length) parts.push(`<span><i class="dot dot-free"></i><b>${esc(free.join(", "))}</b> free</span>`);
         if (over.length) parts.push(`<span><i class="dot dot-over"></i><b>${esc(over.join(", "))}</b> over limit</span>`);
     }
@@ -220,6 +222,10 @@ function renderTriage() {
     el.setAttribute("aria-busy", String(!!loading));
     $("triage-count").textContent = loading ? "" : unowned.length;
     if (loading) { el.innerHTML = skeletonRows(3); return; }
+    if (!unowned.length && repoPartial()) {
+        el.innerHTML = `<li class="all-clear">${icon("alert")}<strong>Some repos couldn’t load</strong><span>Unowned work there isn’t shown.</span></li>`;
+        return;
+    }
     if (!unowned.length) {
         el.innerHTML = `<li class="all-clear">${icon("check-circle")}<strong>Everything has an owner</strong><span>New unassigned work will show up here.</span></li>`;
         return;
@@ -351,6 +357,8 @@ async function assign(key, login, { session = false } = {}) {
         if (route.item === key) openDetail(key, { replace: true, quiet: true });
     } catch (error) {
         busy.delete(key);
+        renderTriage();
+        if (route.item === key) renderDetailSide();
         toast(esc(error.message), { error: true });
         await load(error.code === "conflict" ? "refresh" : "get_state", error.code === "conflict" ? { force: true } : {});
     }
@@ -542,7 +550,7 @@ function peopleList(list, empty) {
 function renderDetailSide() {
     const side = detailEl.querySelector(".dv-side");
     const d = route.data;
-    if (!side || !d) return;
+    if (!side || !d || !route.item) return;
     const key = route.item;
     const isUnowned = d.kind === "issue" && d.state === "open" && !d.assignees.length && S?.tracking.repos.some(r => r.toLowerCase() === d.repository.toLowerCase());
     const pickerOpen = openPicker === `detail:${key}`;
@@ -572,6 +580,7 @@ function fill(slot, html) {
 }
 
 function renderDetail() {
+    if (!route.item) return;
     const d = route.data;
     const { repository, number } = splitKey(route.item);
     const bar = `<div class="dv-bar">
@@ -609,6 +618,7 @@ function renderDetail() {
 async function showRoute(quiet = false) {
     const key = parseHash();
     if (!key) {
+        route.token++;
         if (!route.item) return;
         route.item = null; route.data = null;
         if (openPicker?.startsWith("detail:")) openPicker = null;

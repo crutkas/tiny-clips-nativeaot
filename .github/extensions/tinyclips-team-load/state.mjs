@@ -5,6 +5,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TeamLoadError, normalizeTracking, validateConfig } from "./model.mjs";
 
+export const MAX_KNOWN_PEOPLE = 50;
+export const MAX_KNOWN_REPOS = 30;
+
 export const extensionRoot = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = join(extensionRoot, "..", "..", "..");
 
@@ -37,7 +40,7 @@ export function createTrackingStore(config, home = process.env.COPILOT_HOME || j
             const data = JSON.parse(raw);
             if (data.format !== FORMAT || data.version !== 1) throw new Error("unknown format or version");
             const tracking = normalizeTracking({ people: data.people, repos: data.repos });
-            const known = normalizeTracking({ people: data.knownPeople ?? [], repos: data.knownRepos ?? [] });
+            const known = normalizeTracking({ people: data.knownPeople ?? [], repos: data.knownRepos ?? [] }, { maxPeople: MAX_KNOWN_PEOPLE, maxRepos: MAX_KNOWN_REPOS });
             return { ...tracking, knownPeople: known.people, knownRepos: known.repos };
         } catch (error) {
             throw new TeamLoadError("storage_error", `Tracking file ${path} is invalid (${error.message}). Move or delete it to reset.`);
@@ -51,9 +54,9 @@ export function createTrackingStore(config, home = process.env.COPILOT_HOME || j
             const lower = list => new Set(list.map(value => value.toLowerCase()));
             const defaultsPeople = lower(config.people);
             const defaultsRepos = lower([...config.repositories, ...config.availableRepositories]);
-            const knownPeople = [...new Set([...current.knownPeople, ...tracking.people])].filter(login => !defaultsPeople.has(login)).slice(-50);
+            const knownPeople = [...new Set([...current.knownPeople, ...tracking.people])].filter(login => !defaultsPeople.has(login)).slice(-MAX_KNOWN_PEOPLE);
             const knownRepoMap = new Map([...current.knownRepos, ...tracking.repos].map(repo => [repo.toLowerCase(), repo]));
-            const knownRepos = [...knownRepoMap.values()].filter(repo => !defaultsRepos.has(repo.toLowerCase())).slice(-30);
+            const knownRepos = [...knownRepoMap.values()].filter(repo => !defaultsRepos.has(repo.toLowerCase())).slice(-MAX_KNOWN_REPOS);
             const value = { ...tracking, knownPeople, knownRepos };
             const temporary = join(directory, `tracking.${randomUUID()}.tmp`);
             let created = false;

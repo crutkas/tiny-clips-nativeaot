@@ -277,6 +277,21 @@ test("tracking store defaults, persists atomically, and remembers added entries"
     } finally { await rm(home, { recursive: true, force: true }); }
 });
 
+test("tracking store still reads after remembering more people than can be tracked", async () => {
+    const home = await mkdtemp(join(tmpdir(), "team-load-"));
+    try {
+        const store = createTrackingStore(config, home);
+        for (let i = 0; i < 3; i++) {
+            const people = Array.from({ length: 10 }, (_, j) => `person${i * 10 + j}`);
+            await store.write({ people, repos: ["jamesmontemagno/tiny-clips"] });
+        }
+        const read = await store.read();
+        assert.equal(read.knownPeople.length, 30);
+        await store.write({ people: ["burkeholland"], repos: ["jamesmontemagno/tiny-clips"] });
+        assert.equal((await store.read()).knownPeople.length, 30);
+    } finally { await rm(home, { recursive: true, force: true }); }
+});
+
 // ---------- hub ----------
 
 function hubFixture({ sendPrompt = async () => {}, issues = { "o/r": [issueNode(5)] }, failing = [] } = {}) {
@@ -293,7 +308,7 @@ function hubFixture({ sendPrompt = async () => {}, issues = { "o/r": [issueNode(
         assign: async ({ repository, number, login }) => { writes.push(["assign", repository, number, login]); assignees.set(`${repository}#${number}`, [login]); return { assignees: [login] }; },
         unassign: async ({ repository, number, login }) => { writes.push(["unassign", repository, number, login]); assignees.set(`${repository}#${number}`, []); return { assignees: [] }; },
     };
-    return { hub: createHub(cfg, { store, github, sendPrompt, now: () => T }), writes, store };
+    return { hub: createHub(cfg, { store, github, sendPrompt, now: () => T }), writes, store, github };
 }
 
 async function settle(hub) {
@@ -336,6 +351,13 @@ test("start_session assigns me, sends the prompt, and rolls back if sending fail
     await bad.hub.refresh(); await settle(bad.hub);
     await assert.rejects(bad.hub.startSession({ repository: "o/r", number: 5 }));
     assert.deepEqual(bad.writes, [["assign", "o/r", 5, "burkeholland"], ["unassign", "o/r", 5, "burkeholland"]]);
+});
+
+test("start_session reports when the rollback unassign also fails", async () => {
+    const f = hubFixture({ sendPrompt: async () => { throw new Error("offline"); } });
+    await f.hub.refresh(); await settle(f.hub);
+    f.github.unassign = async () => { throw new Error("rate limited"); };
+    await assert.rejects(f.hub.startSession({ repository: "o/r", number: 5 }), error => /may still be assigned/.test(error.message) && !/was undone/.test(error.message));
 });
 
 test("set_tracking validates new people and repos, then persists", async () => {
