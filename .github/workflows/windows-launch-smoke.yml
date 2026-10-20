@@ -31,7 +31,7 @@ on:
         required: false
         default: "60"
       use_local_nvme:
-        description: "Pilot local NVMe storage for ARM64 source=build jobs"
+        description: "Pilot a local NVMe Dev Drive for ARM64 source=build jobs"
         type: boolean
         default: false
 
@@ -99,8 +99,9 @@ jobs:
           $disk |
             Initialize-Disk -PartitionStyle GPT -PassThru |
             New-Partition -DriveLetter D -UseMaximumSize |
-            Format-Volume -FileSystem NTFS -NewFileSystemLabel Build -Confirm:$false -Force |
+            Format-Volume -DevDrive -FileSystem ReFS -NewFileSystemLabel DevDrive -Confirm:$false -Force |
             Out-Null
+          Get-Volume -DriveLetter D | Format-List DriveLetter, FileSystemType, FileSystemLabel
           New-Item -ItemType Directory -Force -Path D:\workspace, D:\tmp, D:\nuget\packages, D:\nuget\http-cache | Out-Null
 
           # DirectoryInfo.Delete() refuses non-empty directories, even if files appear after the check.
@@ -113,7 +114,7 @@ jobs:
             'TMP=D:\tmp'
             'NUGET_PACKAGES=D:\nuget\packages'
             'NUGET_HTTP_CACHE_PATH=D:\nuget\http-cache'
-            'SMOKE_STORAGE=local-nvme'
+            'SMOKE_STORAGE=local-nvme-dev-drive'
           )
           "Local NVMe storage ready in $([math]::Round($timer.Elapsed.TotalSeconds, 2)) seconds."
 

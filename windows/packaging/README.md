@@ -126,8 +126,10 @@ The *Windows Launch Smoke* workflow has an opt-in `use_local_nvme` input, defaul
 `false`. It applies only to `source=build` on the `windows-11-arm` matrix leg. Release-mode
 smoke tests, x64 jobs, and the normal CI/release/Store workflows are unchanged.
 
-When enabled, a step **before checkout** initializes an unused RAW local NVMe disk as `D:`
-and replaces the empty workspace with a junction. Build files, `TEMP`/`TMP`, NuGet packages,
+When enabled, a step **before checkout** initializes an unused RAW local NVMe disk as a
+ReFS-backed Windows **Dev Drive** at `D:` and replaces the empty workspace with a junction.
+This follows the [upstream Dev Drive enhancement](https://github.com/crutkas/t3code/commit/28dcb43a90840abe042a24e4b089b160a5baedb4);
+the original pilot used NTFS. Build files, `TEMP`/`TMP`, NuGet packages,
 and NuGet's HTTP cache then use that disk. If no suitable disk exists or `D:` is occupied,
 the step warns and keeps the default storage. A non-empty or redirected workspace is an
 error; setup never recursively deletes the workspace or changes Defender settings. This
@@ -145,8 +147,9 @@ gh workflow run windows-launch-smoke.yml --ref $branch -f source=build -f asset_
 Repeat several pairs without moving the branch, keeping all other inputs and cache
 conditions the same. Compare the ARM64 job's total duration (including NVMe setup) and its
 checkout and **Build and package MSIX from this branch** step durations. **Describe runner**
-logs the selected storage mode and cache paths, so a fallback is not mistaken for an NVMe
-result. Both runs must still pass the package verification, launch, and editor smoke checks.
+logs `local-nvme-dev-drive` and the cache paths, and the setup step reports the volume's
+filesystem, so a fallback is not mistaken for a Dev Drive result. Both runs must still pass
+the package verification, launch, and editor smoke checks.
 Installed packages in `C:\Program Files\WindowsApps` and deliberate smoke-test waits remain
 unchanged; do not expect the pnpm speedup from the
 [reference change](https://github.com/crutkas/t3code/commit/199de70c0872c34aa65d49177a431832556a20b3)
@@ -160,7 +163,8 @@ pwsh -NoProfile -File .github\tests\WindowsArmNvme.Tests.ps1
 
 ##### Initial hosted measurements (2026-10-20)
 
-Both runs used commit `dfb9934a2af3ead03b69ff79e961211ae3a01f75`, `source=build`,
+These initial NTFS measurements predate the Dev Drive enhancement. Both runs used commit
+`dfb9934a2af3ead03b69ff79e961211ae3a01f75`, `source=build`,
 `asset_version=2.0.0`, `wait_seconds=60`, and .NET SDK `10.0.402`. The only dispatch-input
 difference was `use_local_nvme`.
 

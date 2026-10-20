@@ -30,6 +30,11 @@ function New-TestDisk([int]$Number = 1, [long]$Size = 100) {
 }
 
 function Get-Disk { $script:disks }
+function Get-Volume {
+    param($DriveLetter)
+    Assert-True ($DriveLetter -eq 'D') 'Unexpected volume inspection.'
+    [pscustomobject]@{ DriveLetter = 'D'; FileSystemType = 'ReFS'; FileSystemLabel = 'DevDrive' }
+}
 function Test-Path { param($LiteralPath) $script:driveTaken }
 function Get-Item { param($LiteralPath, [switch]$Force) $script:workspace }
 function Get-ChildItem { param($LiteralPath, [switch]$Force) $script:files }
@@ -58,9 +63,9 @@ function New-Partition {
     }
 }
 function Format-Volume {
-    param([Parameter(ValueFromPipeline)]$InputObject, $FileSystem, $NewFileSystemLabel, [bool]$Confirm, [switch]$Force)
+    param([Parameter(ValueFromPipeline)]$InputObject, [switch]$DevDrive, $FileSystem, $NewFileSystemLabel, [bool]$Confirm, [switch]$Force)
     process {
-        Assert-True ($FileSystem -eq 'NTFS' -and -not $Confirm -and $Force) 'Unexpected format options.'
+        Assert-True ($DevDrive -and $FileSystem -eq 'ReFS' -and $NewFileSystemLabel -eq 'DevDrive' -and -not $Confirm -and $Force) 'Expected a ReFS Dev Drive.'
         $script:operations.Add('format')
         if ($script:failFormat) { throw 'Simulated disk failure' }
     }
@@ -173,7 +178,7 @@ try {
         $expected = 'initialize:2,partition,format,new:Directory,cd:' + $env:RUNNER_TEMP + ',delete-empty-workspace,new:Junction,environment'
         Assert-True (($script:operations | Where-Object { $_ -notlike 'set:*' }) -join ',' -eq $expected) 'Setup order changed.'
         Assert-True (@($script:operations | Where-Object { $_ -like 'set:*' }).Count -eq 2) 'Offline/read-only flags not cleared.'
-        Assert-True (($script:environment -join ',') -eq 'TEMP=D:\tmp,TMP=D:\tmp,NUGET_PACKAGES=D:\nuget\packages,NUGET_HTTP_CACHE_PATH=D:\nuget\http-cache,SMOKE_STORAGE=local-nvme') 'Environment relocation incomplete.'
+        Assert-True (($script:environment -join ',') -eq 'TEMP=D:\tmp,TMP=D:\tmp,NUGET_PACKAGES=D:\nuget\packages,NUGET_HTTP_CACHE_PATH=D:\nuget\http-cache,SMOKE_STORAGE=local-nvme-dev-drive') 'Environment relocation incomplete.'
         Assert-True ($script:warnings.Count -eq 0) 'Successful setup warned.'
     }
 } finally {
