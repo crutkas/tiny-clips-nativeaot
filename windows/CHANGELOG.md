@@ -6,6 +6,9 @@ own `CHANGELOG.md` at the repository root.
 ## [Unreleased]
 
 ### Changed
+- Added an opt-in local-NVMe storage pilot to ARM64 build-mode Windows Launch Smoke jobs,
+  moving the workspace, temporary files, and NuGet caches before checkout. Other builds
+  keep their existing storage; the pilot warns and falls back if no suitable disk is available.
 - Studio now remembers each project's saved location across restarts. **Save project** (Ctrl+S) updates it; **Save project as...** (Ctrl+Shift+S) chooses a new location. Opening a saved project links explicit Save back to its original folder, while internal autosave stays local.
 - Studio video export now asks for a filename and destination, starting in the saved project folder or the configured video folder. Confirmed overwrites preserve the previous video if rendering fails or is cancelled, and later project saves preserve exported videos in the project folder.
 - Studio save/export safety checks now preserve late unrelated asset collisions, verify approved output file identity/change versions, and resolve directory aliases before protecting project data and source recordings.

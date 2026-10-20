@@ -120,6 +120,44 @@ requires the process to stay alive. See [`sandbox/README.md`](sandbox/README.md)
 x64-only; for ARM64 run the *Windows Launch Smoke* workflow (`source=release`,
 `windows-11-arm` runner).
 
+#### ARM64 build-storage pilot
+
+The *Windows Launch Smoke* workflow has an opt-in `use_local_nvme` input, defaulting to
+`false`. It applies only to `source=build` on the `windows-11-arm` matrix leg. Release-mode
+smoke tests, x64 jobs, and the normal CI/release/Store workflows are unchanged.
+
+When enabled, a step **before checkout** initializes an unused RAW local NVMe disk as `D:`
+and replaces the empty workspace with a junction. Build files, `TEMP`/`TMP`, NuGet packages,
+and NuGet's HTTP cache then use that disk. If no suitable disk exists or `D:` is occupied,
+the step warns and keeps the default storage. A non-empty or redirected workspace is an
+error; setup never recursively deletes the workspace or changes Defender settings. This
+is for disposable GitHub-hosted ARM64 runners only, not local machines or self-hosted runners.
+
+To benchmark a branch containing this workflow, dispatch the same commit with storage
+disabled and enabled:
+
+```powershell
+$branch = "your-pilot-branch"
+gh workflow run windows-launch-smoke.yml --ref $branch -f source=build -f asset_version=2.0.0 -f wait_seconds=60 -f use_local_nvme=false
+gh workflow run windows-launch-smoke.yml --ref $branch -f source=build -f asset_version=2.0.0 -f wait_seconds=60 -f use_local_nvme=true
+```
+
+Repeat several pairs without moving the branch, keeping all other inputs and cache
+conditions the same. Compare the ARM64 job's total duration (including NVMe setup) and its
+checkout and **Build and package MSIX from this branch** step durations. **Describe runner**
+logs the selected storage mode and cache paths, so a fallback is not mistaken for an NVMe
+result. Both runs must still pass the package verification, launch, and editor smoke checks.
+Installed packages in `C:\Program Files\WindowsApps` and deliberate smoke-test waits remain
+unchanged; do not expect the pnpm speedup from the
+[reference change](https://github.com/crutkas/t3code/commit/199de70c0872c34aa65d49177a431832556a20b3)
+to predict .NET build gains.
+
+Run the storage setup's mocked safety checks locally (no real disk operations):
+
+```powershell
+pwsh -NoProfile -File .github\tests\WindowsArmNvme.Tests.ps1
+```
+
 #### Verifying on a real clean machine
 
 On a normal Windows 11 machine, direct MSIX and winget installation should not prompt for or install
