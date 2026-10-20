@@ -189,6 +189,36 @@ the NVMe run downloaded and installed them, accounting for much of its extra set
 Keep the pilot opt-in and repeat measurements on comparable images/cache states before
 making it a default or claiming a repeatable speedup.
 
+##### ReFS Dev Drive retest (2026-10-20)
+
+After adapting upstream commit `28dcb43a90840abe042a24e4b089b160a5baedb4`, the following
+runs used the same Tiny Clips commit `0e8a3a05008a6e99146940be9d1248844916c48d` and the
+same build/version/wait inputs as above. The baseline was repeated once on ARM64 only
+to try to obtain a matching runner image.
+
+| ARM64 metric | [Default, attempt 1](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39481560505/attempts/1) | [Default, attempt 2](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39481560505/attempts/2) | [ReFS Dev Drive](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39482988768) |
+| --- | --- | --- | --- |
+| Build and package step | 4m11s | 3m38s | 3m06s |
+| Total job, including setup and cleanup, excluding queue | 8m07s | 7m24s | 6m08s |
+| NVMe setup | Skipped | Skipped | 14s |
+| .NET SDK setup | 43s | 44s | 3s |
+| Checkout | 12s | 11s | 9s |
+| ARM runner image version | `20261013.183.4` | `20261013.183.4` | `20261018.189.1` |
+
+All three ARM64 executions passed, as did both full runs' x64 legs. The enabled run
+reported `FileSystemType: ReFS`, `FileSystemLabel: DevDrive`, and
+`Build storage: local-nvme-dev-drive`; temporary files and NuGet caches were on `D:`.
+Package verification, signing, installation, app launch, and editor single-instance
+checks all passed.
+
+In these observations, Dev Drive build/package time was **32-65s shorter** and total
+job time **76-119s shorter** than the two baselines. These are not isolated storage
+effect estimates: both baselines received the older image and downloaded SDK
+`10.0.402`/runtime `10.0.13`; the Dev Drive image had them installed already. The repeat
+did not achieve matching images, and the two baseline build times themselves varied by
+33s. There is also no controlled evidence here that ReFS improves on the previous NTFS
+pilot. Keep the optimization opt-in pending more comparable measurements.
+
 #### Verifying on a real clean machine
 
 On a normal Windows 11 machine, direct MSIX and winget installation should not prompt for or install
