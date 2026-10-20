@@ -30,6 +30,10 @@ on:
         description: "How long the app must stay alive to count as a pass"
         required: false
         default: "60"
+      use_local_nvme:
+        description: "Pilot a local NVMe Dev Drive for ARM64 source=build jobs"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -55,12 +59,74 @@ jobs:
       ARCH: ${{ matrix.arch }}
       GH_TOKEN: ${{ github.token }}
       APP_PROJECT: windows/src/TinyClips.App/TinyClips.App.csproj
+      SMOKE_STORAGE: default
 
     steps:
+      # Must precede checkout: the empty workspace becomes a junction, preserving all existing paths.
+      - name: Use local NVMe for ARM64 build
+        if: inputs.use_local_nvme && inputs.source == 'build' && matrix.runner == 'windows-11-arm'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or
+              $env:RUNNER_OS -ne 'Windows' -or $env:RUNNER_ARCH -ne 'ARM64') {
+            throw 'Local NVMe setup is restricted to GitHub-hosted Windows ARM64 runners.'
+          }
+
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          $disk = Get-Disk |
+            Where-Object {
+              $_.PartitionStyle -eq 'RAW' -and -not $_.IsBoot -and -not $_.IsSystem -and
+              $_.BusType -eq 'NVMe' -and $_.FriendlyName -match 'NVMe'
+            } |
+            Sort-Object Size -Descending |
+            Select-Object -First 1
+          if (-not $disk -or (Test-Path -LiteralPath 'D:\')) {
+            Write-Warning 'No unused RAW NVMe disk or D: is occupied; keeping default runner storage.'
+            return
+          }
+
+          $workspace = Get-Item -LiteralPath $env:GITHUB_WORKSPACE -Force
+          if (-not $workspace.PSIsContainer -or
+              ($workspace.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+              @(Get-ChildItem -LiteralPath $workspace.FullName -Force).Count -ne 0) {
+            throw 'NVMe setup requires an empty, non-junction workspace before checkout.'
+          }
+
+          "Using disk $($disk.Number): $($disk.FriendlyName), $($disk.Size) bytes"
+          if ($disk.IsOffline) { $disk | Set-Disk -IsOffline $false }
+          if ($disk.IsReadOnly) { $disk | Set-Disk -IsReadOnly $false }
+          $disk |
+            Initialize-Disk -PartitionStyle GPT -PassThru |
+            New-Partition -DriveLetter D -UseMaximumSize |
+            Format-Volume -DevDrive -FileSystem ReFS -NewFileSystemLabel DevDrive -Confirm:$false -Force |
+            Out-Null
+          Get-Volume -DriveLetter D | Format-List DriveLetter, FileSystemType, FileSystemLabel
+          New-Item -ItemType Directory -Force -Path D:\workspace, D:\tmp, D:\nuget\packages, D:\nuget\http-cache | Out-Null
+
+          # DirectoryInfo.Delete() refuses non-empty directories, even if files appear after the check.
+          Set-Location -LiteralPath $env:RUNNER_TEMP
+          [Environment]::CurrentDirectory = $env:RUNNER_TEMP
+          $workspace.Delete()
+          New-Item -ItemType Junction -Path $workspace.FullName -Target D:\workspace | Out-Null
+          Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value @(
+            'TEMP=D:\tmp'
+            'TMP=D:\tmp'
+            'NUGET_PACKAGES=D:\nuget\packages'
+            'NUGET_HTTP_CACHE_PATH=D:\nuget\http-cache'
+            'SMOKE_STORAGE=local-nvme-dev-drive'
+          )
+          "Local NVMe storage ready in $([math]::Round($timer.Elapsed.TotalSeconds, 2)) seconds."
+
       - name: Describe runner
         shell: pwsh
         run: |
           "Source: $env:SOURCE"
+          "Build storage: $env:SMOKE_STORAGE"
+          "Workspace: $env:GITHUB_WORKSPACE"
+          "TEMP: $env:TEMP"
+          "NuGet packages: $env:NUGET_PACKAGES"
+          "NuGet HTTP cache: $env:NUGET_HTTP_CACHE_PATH"
           "OS: $([Environment]::OSVersion.VersionString)  Arch: $env:PROCESSOR_ARCHITECTURE"
           "Display adapters: $((Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name) -join '; ')"
           "Session: $((Get-Process -Id $PID).SessionId)  Interactive: $([Environment]::UserInteractive)"

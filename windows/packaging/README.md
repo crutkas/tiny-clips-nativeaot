@@ -120,6 +120,105 @@ requires the process to stay alive. See [`sandbox/README.md`](sandbox/README.md)
 x64-only; for ARM64 run the *Windows Launch Smoke* workflow (`source=release`,
 `windows-11-arm` runner).
 
+#### ARM64 build-storage pilot
+
+The *Windows Launch Smoke* workflow has an opt-in `use_local_nvme` input, defaulting to
+`false`. It applies only to `source=build` on the `windows-11-arm` matrix leg. Release-mode
+smoke tests, x64 jobs, and the normal CI/release/Store workflows are unchanged.
+
+When enabled, a step **before checkout** initializes an unused RAW local NVMe disk as a
+ReFS-backed Windows **Dev Drive** at `D:` and replaces the empty workspace with a junction.
+This follows the [upstream Dev Drive enhancement](https://github.com/crutkas/t3code/commit/28dcb43a90840abe042a24e4b089b160a5baedb4);
+the original pilot used NTFS. Build files, `TEMP`/`TMP`, NuGet packages,
+and NuGet's HTTP cache then use that disk. If no suitable disk exists or `D:` is occupied,
+the step warns and keeps the default storage. A non-empty or redirected workspace is an
+error; setup never recursively deletes the workspace or changes Defender settings. This
+is for disposable GitHub-hosted ARM64 runners only, not local machines or self-hosted runners.
+
+To benchmark a branch containing this workflow, dispatch the same commit with storage
+disabled and enabled:
+
+```powershell
+$branch = "your-pilot-branch"
+gh workflow run windows-launch-smoke.yml --ref $branch -f source=build -f asset_version=2.0.0 -f wait_seconds=60 -f use_local_nvme=false
+gh workflow run windows-launch-smoke.yml --ref $branch -f source=build -f asset_version=2.0.0 -f wait_seconds=60 -f use_local_nvme=true
+```
+
+Repeat several pairs without moving the branch, keeping all other inputs and cache
+conditions the same. Compare the ARM64 job's total duration (including NVMe setup) and its
+checkout and **Build and package MSIX from this branch** step durations. **Describe runner**
+logs `local-nvme-dev-drive` and the cache paths, and the setup step reports the volume's
+filesystem, so a fallback is not mistaken for a Dev Drive result. Both runs must still pass
+the package verification, launch, and editor smoke checks.
+Installed packages in `C:\Program Files\WindowsApps` and deliberate smoke-test waits remain
+unchanged; do not expect the pnpm speedup from the
+[reference change](https://github.com/crutkas/t3code/commit/199de70c0872c34aa65d49177a431832556a20b3)
+to predict .NET build gains.
+
+Run the storage setup's mocked safety checks locally (no real disk operations):
+
+```powershell
+pwsh -NoProfile -File .github\tests\WindowsArmNvme.Tests.ps1
+```
+
+##### Initial hosted measurements (2026-10-20)
+
+These initial NTFS measurements predate the Dev Drive enhancement. Both runs used commit
+`dfb9934a2af3ead03b69ff79e961211ae3a01f75`, `source=build`,
+`asset_version=2.0.0`, `wait_seconds=60`, and .NET SDK `10.0.402`. The only dispatch-input
+difference was `use_local_nvme`.
+
+| ARM64 metric | [Default storage](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39472796355) | [Local NVMe](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39473916727) |
+| --- | --- | --- |
+| Build and package step | 3m41s | 2m39s |
+| Total job, including setup and cleanup, excluding queue | 6m39s | 6m13s |
+| NVMe setup | Skipped | 17s |
+| .NET SDK setup | 3s | 32s |
+| Checkout | 10s | 10s |
+
+Build/package duration was **62s shorter (28%)**, and the whole ARM64 job was **26s shorter
+(6.5%)** in this pair. The enabled run selected a 220 GiB `Microsoft NVMe Direct Disk v2`,
+logged `Build storage: local-nvme`, and confirmed the temporary/NuGet paths on `D:`.
+Both architectures passed package verification, signing, installation, launch, and editor
+single-instance checks in both runs.
+
+This is **one exploratory pair, not an isolated estimate of the storage effect**. GitHub
+assigned different `windows-11-vs2026-arm64` image versions: `20261018.189.1` for default
+storage and `20261013.183.4` for NVMe. The baseline already had the selected SDK/runtime;
+the NVMe run downloaded and installed them, accounting for much of its extra setup time.
+Keep the pilot opt-in and repeat measurements on comparable images/cache states before
+making it a default or claiming a repeatable speedup.
+
+##### ReFS Dev Drive retest (2026-10-20)
+
+After adapting upstream commit `28dcb43a90840abe042a24e4b089b160a5baedb4`, the following
+runs used the same Tiny Clips commit `0e8a3a05008a6e99146940be9d1248844916c48d` and the
+same build/version/wait inputs as above. The baseline was repeated once on ARM64 only
+to try to obtain a matching runner image.
+
+| ARM64 metric | [Default, attempt 1](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39481560505/attempts/1) | [Default, attempt 2](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39481560505/attempts/2) | [ReFS Dev Drive](https://github.com/jamesmontemagno/tiny-clips/actions/runs/39482988768) |
+| --- | --- | --- | --- |
+| Build and package step | 4m11s | 3m38s | 3m06s |
+| Total job, including setup and cleanup, excluding queue | 8m07s | 7m24s | 6m08s |
+| NVMe setup | Skipped | Skipped | 14s |
+| .NET SDK setup | 43s | 44s | 3s |
+| Checkout | 12s | 11s | 9s |
+| ARM runner image version | `20261013.183.4` | `20261013.183.4` | `20261018.189.1` |
+
+All three ARM64 executions passed, as did both full runs' x64 legs. The enabled run
+reported `FileSystemType: ReFS`, `FileSystemLabel: DevDrive`, and
+`Build storage: local-nvme-dev-drive`; temporary files and NuGet caches were on `D:`.
+Package verification, signing, installation, app launch, and editor single-instance
+checks all passed.
+
+In these observations, Dev Drive build/package time was **32-65s shorter** and total
+job time **76-119s shorter** than the two baselines. These are not isolated storage
+effect estimates: both baselines received the older image and downloaded SDK
+`10.0.402`/runtime `10.0.13`; the Dev Drive image had them installed already. The repeat
+did not achieve matching images, and the two baseline build times themselves varied by
+33s. There is also no controlled evidence here that ReFS improves on the previous NTFS
+pilot. Keep the optimization opt-in pending more comparable measurements.
+
 #### Verifying on a real clean machine
 
 On a normal Windows 11 machine, direct MSIX and winget installation should not prompt for or install
