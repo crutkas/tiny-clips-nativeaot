@@ -6,8 +6,7 @@ import { join } from "node:path";
 import {
     AGENT, TeamLoadError, canonLogin, cleanTitle, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign,
     ago, parseItemUrl, normalizeTracking, validateItemRef, validateConfig, validateEdit, validateSessionBatch, MAX_SESSION_BATCH,
-    MOMENTUM_DAYS, MOMENTUM_METRICS, dailyMomentum, momentumStart, validateMomentumInput,
-} from "../model.mjs";
+    MOMENTUM_DAYS, MOMENTUM_METRICS, dailyMomentum, momentumStart, validateMomentumInput, labelSummary } from "../model.mjs";
 import { readConfig, createTrackingStore } from "../state.mjs";
 import { createGitHub, normalizeIssue, normalizePull } from "../github.mjs";
 import { createHub } from "../hub.mjs";
@@ -1080,4 +1079,17 @@ test("the action endpoint accepts long comments but caps bodies at 256 KiB", asy
         assert.equal((await call("x".repeat(60000))).status, 200);
         assert.notEqual((await call("x".repeat(300000))).status, 200);
     } finally { await server.close(); }
+});
+
+test("labelSummary shows two labels, a +N count and the full list for the tooltip", () => {
+    const l = n => ({ name: n, color: "0e8a16" });
+    assert.deepEqual(labelSummary([]), { shown: [], more: 0, title: "" });
+    assert.deepEqual(labelSummary(undefined), { shown: [], more: 0, title: "" });
+    assert.deepEqual(labelSummary([l("bug")]), { shown: [l("bug")], more: 0, title: "bug" });
+    const four = labelSummary([l("bug"), l("mac"), l("windows"), l("2.0 Launch")]);
+    assert.deepEqual(four.shown.map(x => x.name), ["bug", "mac"]);
+    assert.equal(four.more, 2);
+    assert.equal(four.title, "bug, mac, windows, 2.0 Launch");
+    assert.equal(labelSummary([l("a"), l("b"), l("c")], 1).more, 2);
+    assert.deepEqual(labelSummary([l("a"), { name: "  " }, null]).shown.map(x => x.name), ["a"]);
 });

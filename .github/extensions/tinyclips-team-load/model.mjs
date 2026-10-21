@@ -83,6 +83,13 @@ export function validateItemRef(input, { title = false, login = false, additiona
     return { ...input, ...normalized };
 }
 
+// Compact label display for list rows: the first `max` labels, a "+N" count, and the full list for a tooltip.
+export function labelSummary(labels, max = 2) {
+    const all = (Array.isArray(labels) ? labels : []).filter(l => l && String(l.name ?? "").trim());
+    const shown = all.slice(0, Math.max(0, max));
+    return { shown, more: all.length - shown.length, title: all.map(l => String(l.name)).join(", ") };
+}
+
 export const MAX_SESSION_BATCH = 10;
 // A bulk "start sessions" request: 1..MAX_SESSION_BATCH distinct issue refs, each { repository, number, title? }.
 export function validateSessionBatch(input) {

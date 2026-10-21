@@ -1,4 +1,4 @@
-import { AGENT, canonLogin, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign, ago, shortRepo, parseItemUrl, loginPattern, repoPattern } from "/model.mjs";
+import { AGENT, canonLogin, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign, ago, shortRepo, parseItemUrl, loginPattern, repoPattern, labelSummary } from "/model.mjs";
 import { ICONS } from "/icons.mjs";
 import { sanitizeHtml } from "/markdown.mjs";
 import { createMomentumPanel } from "/momentum.mjs";
@@ -69,7 +69,8 @@ const starting = (() => {
 })();
 const saveStarting = () => { try { localStorage.setItem("team-load-starting", JSON.stringify(Object.fromEntries(starting))); } catch {} };
 const isStarting = key => Date.now() - (starting.get(key) ?? 0) < STARTING_TTL;
-const startingHTML = key => isStarting(key) ? `<span class="starting" title="A local Copilot session was requested">${icon("sync")}Session starting</span>` : "";
+// Replaces the row's issue icon so the status costs no width.
+const startingIcon = () => `<span class="starting" role="img" aria-label="Copilot session starting" title="Copilot session starting">${icon("copilot")}</span>`;
 function selBox(key, title) {
     const n = splitKey(key).number;
     return `<input type="checkbox" class="sel" data-select="${esc(key)}" aria-label="Select #${n} ${esc(title)}"${selected.has(key) ? " checked" : ""}${busy.has(key) || bulkBusy ? " disabled" : ""}>`;
@@ -116,6 +117,11 @@ function meterHTML(person, s) {
 
 function labelHTML(label) {
     return `<span class="IssueLabel" data-color="${esc(label.color)}">${esc(label.name)}</span>`;
+}
+function labelsHTML(labels) {
+    const { shown, more, title } = labelSummary(labels);
+    if (!shown.length) return "";
+    return `<span class="lbls" title="${esc(title)}"><span class="sr-only">Labels: ${esc(title)}</span><span class="lbls-pills" aria-hidden="true">${shown.map(labelHTML).join("")}${more ? `<span class="lbl-more">+${more}</span>` : ""}</span></span>`;
 }
 function paintLabels(scope) {
     const dark = root.dataset.theme === "dark";
@@ -188,9 +194,9 @@ function itemsHTML(p, { movable = false } = {}) {
         const canMove = movable && i.kind === "issue";
         const canSelect = movable && i.kind === "issue";
         return `<li${canSelect ? ` class="sel-row${selected.has(key) ? " is-selected" : ""}"` : ""}>${canSelect ? selBox(key, i.title) : ""}<a class="item" href="${esc(i.url)}" data-item="${esc(key)}" draggable="${canMove && !busy.has(key)}"${canMove ? ` data-move-key="${esc(key)}" data-move-from="${esc(p.login)}" aria-describedby="move-help" aria-busy="${busy.has(key)}"` : ""}>
-      ${kindIcon(i)}
-      <span class="item-title">${esc(i.title)}</span>
-      <span class="item-meta">${startingHTML(key)}${esc(shortRepo(i.repository))} #${i.number} · ${ago(i.updatedAt)}</span></a></li>`;
+      ${i.kind === "issue" && isStarting(key) ? startingIcon() : kindIcon(i)}
+      <span class="item-title">${esc(i.title)}</span>${labelsHTML(i.labels) || `<span class="lbls"></span>`}
+      <span class="item-meta">${esc(shortRepo(i.repository))} #${i.number} · ${ago(i.updatedAt)}</span></a></li>`;
     }).join("")}</ul>`;
 }
 
@@ -231,6 +237,7 @@ function renderRoster() {
       <div class="detail" id="${id}" ${open ? "" : "hidden"}>${itemsHTML(p, { movable: true })}</div>
     </li>`;
     }).join("");
+    paintLabels(el);
 }
 
 // ---- Render: triage + assign popover ----
@@ -288,10 +295,10 @@ function renderTriage() {
         const key = keyOf(it);
         const open = openPicker === key;
         return `<li class="ticket${open ? " is-picking" : ""}${busy.has(key) ? " is-busy" : ""}${selected.has(key) ? " is-selected" : ""}" data-key="${esc(key)}">
-      <span class="sel-slot">${icon("issue-opened")}${selBox(key, it.title)}</span>
+      <span class="sel-slot">${isStarting(key) ? startingIcon() : icon("issue-opened")}${selBox(key, it.title)}</span>
       <div class="ticket-body">
         <a class="ticket-title" href="${esc(it.url)}" data-item="${esc(key)}" title="${esc(it.title)}">${esc(it.title)}</a>
-        <div class="ticket-meta">${startingHTML(key)}<span>${esc(shortRepo(it.repository))} #${it.number} · ${ago(it.updatedAt)}</span>${it.labels.slice(0, 2).map(labelHTML).join("")}</div>
+        <div class="ticket-meta"><span>${esc(shortRepo(it.repository))} #${it.number} · ${ago(it.updatedAt)}</span>${labelsHTML(it.labels)}</div>
       </div>
       <div class="ticket-actions">
         <button class="btn-icon tip is-assign" type="button" data-open-picker="${esc(key)}" aria-expanded="${open}" aria-label="Assign">${icon("person-add")}</button>
@@ -1154,6 +1161,7 @@ function paintPerson() {
         : `<span class="pv-untracked">Not in the tracked team</span>`}`;
     $("pv-count").textContent = entry ? n : "";
     $("pv-items").innerHTML = entry ? itemsHTML(entry) : `<div class="empty-note">Not tracked, so open work isn’t counted. Add them from the tracking menu to see it here.</div>`;
+    paintLabels($("pv-items"));
 }
 
 // ---- Momentum (the home card and each profile are separate panels over the same server call) ----

@@ -631,15 +631,19 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 .sel-row { position: relative; }
 .sel-row > .sel { left: 0; top: 7px; z-index: 1; }
 .ticket:hover .sel, .sel-row:hover > .sel, .sel:focus-visible, .sel:checked, .is-selecting .sel-slot .sel, .is-selecting .sel-row > .sel { opacity: 1; }
-.ticket:hover .sel-slot > .octicon, .sel-slot:has(.sel:focus-visible, .sel:checked) > .octicon, .is-selecting .sel-slot > .octicon,
-.sel-row:hover > .item > .octicon:first-child, .sel-row:has(> .sel:focus-visible, > .sel:checked) > .item > .octicon:first-child, .is-selecting .sel-row > .item > .octicon:first-child { visibility: hidden; }
+.ticket:hover .sel-slot > :is(.octicon, .starting), .sel-slot:has(.sel:focus-visible, .sel:checked) > :is(.octicon, .starting), .is-selecting .sel-slot > :is(.octicon, .starting),
+.sel-row:hover > .item > :is(.octicon, .starting):first-child, .sel-row:has(> .sel:focus-visible, > .sel:checked) > .item > :is(.octicon, .starting):first-child, .is-selecting .sel-row > .item > :is(.octicon, .starting):first-child { visibility: hidden; }
 @media (hover: none) {
   .sel-slot .sel, .sel-row > .sel { opacity: 1; }
-  .sel-slot > .octicon, .sel-row > .item > .octicon:first-child { visibility: hidden; }
+  .sel-slot > :is(.octicon, .starting), .sel-row > .item > :is(.octicon, .starting):first-child { visibility: hidden; }
 }
 .ticket.is-selected, .sel-row.is-selected > .item { background: var(--bgColor-accent-muted); }
-.starting { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; color: var(--fgColor-accent); font-size: 12px; white-space: nowrap; }
-.starting .octicon { width: 12px; height: 12px; }
+/* Session starting: Copilot glyph with a working ring, in the issue-icon slot */
+.starting { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; align-self: center; color: var(--fgColor-done, #8250df); }
+.starting .octicon { width: 11px; height: 11px; animation: working 1.6s ease-in-out infinite; }
+@keyframes working { 50% { opacity: .7; } }
+.starting::before { content: ""; position: absolute; inset: -1px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 25%, transparent); border-top-color: currentColor; border-right-color: currentColor; animation: spin .9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .starting::before, .starting .octicon { animation: none; } }
 
 .bulkbar {
   position: fixed; z-index: 20; left: 50%; bottom: 16px; transform: translateX(-50%); max-width: calc(100vw - 24px);
@@ -659,3 +663,19 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 /* The lists sit flush against their box edges, so the last triage row follows the box's rounded corner. */
 .tickets > li:last-child { border-radius: 0 0 11px 11px; }
 @media (max-width: 480px) { .composer-hint { display: none; } }
+
+/* Label pills on list rows: max 2 + "+N", full list in the tooltip */
+.lbls { display: inline-flex; align-items: center; min-width: 0; max-width: 200px; overflow: hidden; align-self: center; }
+.lbls-pills { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.lbls .IssueLabel { max-width: 96px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.lbl-more { font-size: 11px; line-height: 16px; color: var(--fgColor-muted); flex: none; }
+.item > .lbls { display: none; }
+@container roster (min-width: 640px) {
+  .item { grid-template-columns: 16px minmax(0, 1fr) auto auto; }
+  .item > .lbls { display: inline-flex; }
+}
+@media (min-width: 601px) {
+  .pv-items .item { grid-template-columns: 16px minmax(0, 1fr) auto; }
+  .pv-items .item > .lbls { display: inline-flex; }
+  .pv-items .item-meta { grid-column: 2 / -1; }
+}
