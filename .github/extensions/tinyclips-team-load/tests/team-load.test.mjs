@@ -1093,3 +1093,26 @@ test("labelSummary shows two labels, a +N count and the full list for the toolti
     assert.equal(labelSummary([l("a"), l("b"), l("c")], 1).more, 2);
     assert.deepEqual(labelSummary([l("a"), { name: "  " }, null]).shown.map(x => x.name), ["a"]);
 });
+
+test("planRowUpdate patches only changed rows and rebuilds on reorder", async () => {
+    const { planRowUpdate } = await import("../model.mjs");
+    const a = [{ key: "a", html: "1" }, { key: "b", html: "2" }];
+    assert.deepEqual(planRowUpdate(a, [{ key: "a", html: "1" }, { key: "b", html: "2" }]), []);
+    assert.deepEqual(planRowUpdate(a, [{ key: "a", html: "1" }, { key: "b", html: "3" }]), [1]);
+    assert.equal(planRowUpdate(a, [{ key: "b", html: "2" }, { key: "a", html: "1" }]), null);
+    assert.equal(planRowUpdate(a, [{ key: "a", html: "1" }]), null);
+    assert.equal(planRowUpdate([], []).length, 0);
+});
+
+test("person row toggle stays easy to hit", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const css = await readFile(new URL("../assets/styles.css", import.meta.url), "utf8");
+    const app = await readFile(new URL("../assets/app.mjs", import.meta.url), "utf8");
+    assert.match(css, /\.chev-box\s*\{[^}]*width:\s*32px;[^}]*height:\s*32px/);
+    assert.match(css, /\.person-toggle::after\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0/);
+    assert.match(css, /\.person-row\s*\{[^}]*cursor:\s*pointer/);
+    for (const cols of css.matchAll(/\.person-row[^{]*\{[^}]*grid-template-columns:([^;]+);/g)) assert.match(cols[1], /32px\s*$/, cols[1]);
+    // Background refreshes must not swap rows out mid-click.
+    assert.match(app, /if \(rosterHeld\) \{ rosterPending = true; return; \}/);
+    assert.match(app, /aria-expanded="\$\{open\}"/);
+});

@@ -83,6 +83,18 @@ export function validateItemRef(input, { title = false, login = false, additiona
     return { ...input, ...normalized };
 }
 
+// Keyed list patching: returns the indexes whose HTML changed, or null when keys/order differ and the list must be rebuilt.
+// Leaving unchanged rows in place keeps clicks and hover working while background refreshes re-render.
+export function planRowUpdate(prev, next) {
+    if (!Array.isArray(prev) || prev.length !== next.length) return null;
+    const changed = [];
+    for (let i = 0; i < next.length; i++) {
+        if (prev[i].key !== next[i].key) return null;
+        if (prev[i].html !== next[i].html) changed.push(i);
+    }
+    return changed;
+}
+
 // Compact label display for list rows: the first `max` labels, a "+N" count, and the full list for a tooltip.
 export function labelSummary(labels, max = 2) {
     const all = (Array.isArray(labels) ? labels : []).filter(l => l && String(l.name ?? "").trim());

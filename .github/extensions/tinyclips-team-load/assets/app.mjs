@@ -1,4 +1,4 @@
-import { AGENT, canonLogin, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign, ago, shortRepo, parseItemUrl, loginPattern, repoPattern, labelSummary } from "/model.mjs";
+import { AGENT, canonLogin, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign, ago, shortRepo, parseItemUrl, loginPattern, repoPattern, labelSummary, planRowUpdate } from "/model.mjs";
 import { ICONS } from "/icons.mjs";
 import { sanitizeHtml } from "/markdown.mjs";
 import { createMomentumPanel } from "/momentum.mjs";
@@ -200,7 +200,31 @@ function itemsHTML(p, { movable = false } = {}) {
     }).join("")}</ul>`;
 }
 
+let rosterRows = [];
+// A re-render between pointerdown and pointerup swaps the row out from under the pointer, so the browser never fires the click.
+// Hold background renders while a pointer is down in the roster and catch up once it lifts.
+let rosterHeld = false, rosterPending = false, rosterHoldTimer = 0;
+function holdRoster(event) {
+    if (event.button !== 0 || !event.target.closest?.("#roster")) return;
+    rosterHeld = true;
+    // A pointerup outside the panel never reaches us; don't let that freeze the list.
+    clearTimeout(rosterHoldTimer);
+    rosterHoldTimer = setTimeout(releaseRoster, 4000);
+}
+function releaseRoster() {
+    if (!rosterHeld) return;
+    rosterHeld = false;
+    clearTimeout(rosterHoldTimer);
+    // Let the click that follows pointerup run against the current rows first.
+    if (rosterPending) setTimeout(() => { if (!rosterHeld && rosterPending) { renderRoster(); fitNow(); } });
+}
+document.addEventListener("pointerdown", holdRoster, true);
+document.addEventListener("pointerup", releaseRoster, true);
+document.addEventListener("pointercancel", releaseRoster, true);
+window.addEventListener("blur", releaseRoster);
 function renderRoster() {
+    if (rosterHeld) { rosterPending = true; return; }
+    rosterPending = false;
     if (movingIssue) endMove("Move cancelled because the team data changed.");
     const el = $("roster");
     const loading = !S.items.length && repoLoading();
@@ -211,14 +235,14 @@ function renderRoster() {
     }
     if (loading) { el.innerHTML = skeletonRows(Math.min(people.length, 6)); return; }
     const s = scale();
-    el.innerHTML = sortRoster(people).map(p => {
+    const rows = sortRoster(people).map(p => {
         const n = p.items.length;
         const t = tone(n, { agent: p.agent, limit: limit() });
         const open = openRows.has(p.login);
         const latest = p.items[0];
         const id = `d-${p.login}`;
         // The row is a div: its toggle button stretches over it (see .person-toggle::after), so the profile link can sit beside the name without nesting a link in a button.
-        return `<li class="person${p.agent ? " is-agent" : ""}${open ? " is-open" : ""}" data-login="${esc(p.login)}">
+        const html = `<li class="person${p.agent ? " is-agent" : ""}${open ? " is-open" : ""}" data-login="${esc(p.login)}">
       <div class="person-row">
         ${avatarHTML(p)}
         <span class="who">
@@ -232,12 +256,26 @@ function renderRoster() {
         ${meterHTML(p, s)}
         <span class="count${n ? "" : " is-zero"}">${n}</span>
         <span class="now">${latest ? `<span class="num">#${latest.number}</span> <span class="t">${esc(latest.title)}</span>` : "Nothing assigned"}</span>
-        ${icon("chevron-down", "chev")}
+        <span class="chev-box" aria-hidden="true">${icon("chevron-down", "chev")}</span>
       </div>
       <div class="detail" id="${id}" ${open ? "" : "hidden"}>${itemsHTML(p, { movable: true })}</div>
     </li>`;
-    }).join("");
-    paintLabels(el);
+        return { key: p.login, html };
+    });
+    const lis = [...el.children];
+    const plan = lis.length === rosterRows.length && lis.every(li => li.classList.contains("person")) ? planRowUpdate(rosterRows, rows) : null;
+    if (plan) {
+        for (const i of plan) {
+            lis[i].insertAdjacentHTML("afterend", rows[i].html);
+            const fresh = lis[i].nextElementSibling;
+            lis[i].remove();
+            paintLabels(fresh);
+        }
+    } else {
+        el.innerHTML = rows.map(r => r.html).join("");
+        paintLabels(el);
+    }
+    rosterRows = rows;
 }
 
 // ---- Render: triage + assign popover ----

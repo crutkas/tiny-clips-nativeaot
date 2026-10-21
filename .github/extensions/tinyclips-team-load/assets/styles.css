@@ -126,8 +126,8 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 .person.is-agent { border-top: 1px dashed var(--borderColor-default); }
 .person-row {
   position: relative; display: grid; align-items: center; gap: 12px;
-  grid-template-columns: 32px minmax(0, 1fr) auto 28px 16px;
-  padding: 10px 16px; background: transparent; cursor: pointer;
+  grid-template-columns: 32px minmax(0, 1fr) auto 28px 32px;
+  padding: 10px 8px 10px 16px; background: transparent; cursor: pointer;
   transition: background-color .5s ease;
 }
 .person-row:hover, .person.is-open .person-row { background: var(--bgColor-muted); }
@@ -162,12 +162,14 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 .tone-agent { color: var(--fgColor-done); }
 .count { font-size: 16px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .count.is-zero { color: var(--fgColor-muted); font-weight: 400; }
+.chev-box { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 6px; }
+.person-row:hover .chev-box { background: var(--bgColor-neutral-muted); }
 .chev { color: var(--fgColor-muted); transition: transform .15s ease; }
 .person.is-open .chev { transform: rotate(180deg); }
 .now { display: none; }
 .person.is-open .now { visibility: hidden; }
 .roster.no-now .now { display: none !important; }
-.roster.no-now .person-row { grid-template-columns: 32px minmax(0, 1fr) auto 28px 16px; }
+.roster.no-now .person-row { grid-template-columns: 32px minmax(0, 1fr) auto 28px 32px; }
 
 /* Capacity meter: one cell per open item, tick marks the limit */
 .meter { display: flex; align-items: center; gap: 2px; --cell: 7px; }
@@ -184,7 +186,7 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
   .meter { --cell: 12px; }
 }
 @container roster (min-width: 720px) {
-  .person-row { grid-template-columns: 32px 170px auto 28px minmax(0, 1fr) 16px; gap: 16px; }
+  .person-row { grid-template-columns: 32px 170px auto 28px minmax(0, 1fr) 32px; gap: 16px; }
   .now { display: block; min-width: 0; font-size: 13px; color: var(--fgColor-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 8px; }
   .now .num { color: var(--fgColor-muted); }
   .now .t { color: var(--fgColor-default); }
