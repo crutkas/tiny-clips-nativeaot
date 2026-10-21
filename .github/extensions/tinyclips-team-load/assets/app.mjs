@@ -121,7 +121,7 @@ function labelHTML(label) {
 function labelsHTML(labels) {
     const { shown, more, title } = labelSummary(labels);
     if (!shown.length) return "";
-    return `<span class="lbls" title="${esc(title)}"><span class="sr-only">Labels: ${esc(title)}</span><span class="lbls-pills" aria-hidden="true">${shown.map(labelHTML).join("")}${more ? `<span class="lbl-more">+${more}</span>` : ""}</span></span>`;
+    return `<span class="lbls" title="${esc(title)}"><span class="sr-only">Labels: ${esc(title)}</span><span class="lbls-pills" aria-hidden="true">${shown.map(labelHTML).join("")}</span>${more ? `<span class="lbl-more" aria-hidden="true">+${more}</span>` : ""}</span>`;
 }
 function paintLabels(scope) {
     const dark = root.dataset.theme === "dark";

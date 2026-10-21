@@ -1116,3 +1116,14 @@ test("person row toggle stays easy to hit", async () => {
     assert.match(app, /if \(rosterHeld\) \{ rosterPending = true; return; \}/);
     assert.match(app, /aria-expanded="\$\{open\}"/);
 });
+
+test("expanded item lists start at the card edge and labels shrink before titles", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const css = await readFile(new URL("../assets/styles.css", import.meta.url), "utf8");
+    assert.match(css, /\.detail \{ padding: 2px 16px 10px; /);
+    assert.match(css, /\.item > \.lbls \{[^}]*flex: 0 10000 auto/);
+    assert.match(css, /\.item > \.item-title \{ flex: 0 1 auto; min-width: 0; \}/);
+    const app = await readFile(new URL("../assets/app.mjs", import.meta.url), "utf8");
+    // +N sits outside the shrinking pill strip so it never gets clipped.
+    assert.match(app, /<\/span>\$\{more \? `<span class="lbl-more"/);
+});

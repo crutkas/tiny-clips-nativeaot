@@ -193,7 +193,7 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 }
 
 /* Expanded detail */
-.detail { padding: 0 16px 10px 60px; background: var(--bgColor-muted); }
+.detail { padding: 2px 16px 10px; background: var(--bgColor-muted); }
 .detail[hidden] { display: none; }
 .mix { display: flex; gap: 14px; font-size: 12px; color: var(--fgColor-muted); padding: 0 0 6px; }
 .mix span { display: inline-flex; align-items: center; gap: 4px; }
@@ -667,14 +667,21 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 @media (max-width: 480px) { .composer-hint { display: none; } }
 
 /* Label pills on list rows: max 2 + "+N", full list in the tooltip */
-.lbls { display: inline-flex; align-items: center; min-width: 0; max-width: 200px; overflow: hidden; align-self: center; }
+.lbls { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 200px; overflow: hidden; align-self: center; }
 .lbls-pills { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
-.lbls .IssueLabel { max-width: 96px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.lbls .IssueLabel { max-width: 96px; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .lbl-more { font-size: 11px; line-height: 16px; color: var(--fgColor-muted); flex: none; }
 .item > .lbls { display: none; }
 @container roster (min-width: 640px) {
-  .item { grid-template-columns: 16px minmax(0, 1fr) auto auto; }
-  .item > .lbls { display: inline-flex; }
+  /* Titles win: the huge shrink factor makes the labels give up their width before the title truncates. */
+  .item { display: flex; align-items: center; }
+  .item > :is(.octicon, .starting):first-child { flex: none; }
+  .item > .item-title { flex: 0 1 auto; min-width: 0; }
+  .item > .lbls { display: inline-flex; flex: 0 10000 auto; margin-left: auto; }
+  .item > .item-meta { flex: none; }
+  .item .lbls-pills { flex: 0 1 auto; overflow: hidden; }
+  .item > .lbls:has(.lbl-more) { min-width: 2em; }
+  .item .lbls .IssueLabel { min-width: 3.5em; }
 }
 @media (min-width: 601px) {
   .pv-items .item { grid-template-columns: 16px minmax(0, 1fr) auto; }
