@@ -121,7 +121,7 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 
 /* Roster */
 .roster-box { container-type: inline-size; container-name: roster; }
-.roster { list-style: none; margin: 0; padding: 4px 0; }
+.roster { list-style: none; margin: 0; padding: 0; }
 .person + .person { border-top: 1px solid var(--borderColor-muted); }
 .person.is-agent { border-top: 1px dashed var(--borderColor-default); }
 .person-row {
@@ -213,7 +213,7 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 .empty-note { font-size: 13px; color: var(--fgColor-muted); padding: 4px 0; }
 
 /* Triage: one compact row per issue */
-.tickets { list-style: none; margin: 0; padding: 4px 0; }
+.tickets { list-style: none; margin: 0; padding: 0; }
 .ticket { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 8px 8px 16px; }
 .ticket:hover, .ticket.is-picking { background: var(--bgColor-muted); }
 .ticket + .ticket { border-top: 1px solid var(--borderColor-muted); }
@@ -583,3 +583,79 @@ h2 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0; display: f
 .pv-items { padding: 12px 16px; }
 .pv-items .item { grid-template-columns: 16px minmax(0, 1fr); row-gap: 0; }
 .pv-items .item-meta { grid-column: 2; }
+
+/* Detail edits */
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--button-primary-bgColor-rest); border-color: transparent; color: var(--fgColor-onEmphasis); }
+.btn-primary:hover:not(:disabled) { background: var(--button-primary-bgColor-hover); }
+.btn .c-close { color: #8250df; }
+.btn .c-open { color: #1a7f37; }
+.side-head { position: relative; display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.side-head h3 { margin: 0; }
+.side-edit { width: 24px; height: 24px; margin-right: -4px; }
+.side-edit .octicon { width: 14px; height: 14px; }
+.side-head .picker { top: calc(100% + 4px); left: auto; right: 0; }
+.pick-label { grid-template-columns: 16px 12px minmax(0, 1fr); }
+.pick-label[aria-disabled="true"] { opacity: .6; cursor: progress; }
+.pick-check { display: grid; place-items: center; color: var(--fgColor-default); }
+.pick-check .octicon { width: 14px; height: 14px; }
+.label-dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px #1f232826; }
+.label-list .pick-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.composer { margin-top: 16px; border: 1px solid var(--borderColor-default); border-radius: 6px; background: var(--bgColor-default); }
+.composer textarea {
+  display: block; width: 100%; min-height: 96px; resize: vertical; padding: 10px 12px; border: 0; border-radius: 6px 6px 0 0;
+  font: inherit; font-size: 14px; line-height: 20px; color: var(--fgColor-default); background: transparent;
+}
+.composer textarea::placeholder { color: var(--fgColor-muted); }
+.composer:focus-within { outline: 2px solid var(--focus-outlineColor); outline-offset: -1px; border-color: transparent; }
+.composer textarea:focus { outline: none; }
+.composer-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; border-top: 1px solid var(--borderColor-muted); }
+.composer-hint { flex: 1; font-size: 12px; color: var(--fgColor-muted); white-space: nowrap; }
+.composer-actions { display: flex; gap: 8px; margin-left: auto; }
+.c-del { width: 24px; height: 24px; margin: -4px -6px -4px 0; }
+.c-del .octicon { width: 14px; height: 14px; }
+.c-del:hover { background: var(--bgColor-danger-muted); color: var(--fgColor-danger); }
+.c-del.is-armed { width: auto; gap: 4px; padding: 0 8px; display: inline-flex; align-items: center; background: var(--bgColor-danger-muted); color: var(--fgColor-danger); font-size: 12px; font-weight: 600; }
+.c-del.is-armed::after { display: none; }
+
+/* Bulk selection: checkboxes sit over the issue icon and show on hover, focus, touch, or once anything is selected. */
+.sel { width: 16px; height: 16px; margin: 0; accent-color: var(--bgColor-accent-emphasis); cursor: pointer; }
+.sel:disabled { cursor: progress; }
+.sel-all { align-self: center; margin-right: 2px; }
+.sel-all[hidden] { display: none; }
+.sel-slot { position: relative; width: 16px; height: 16px; align-self: start; margin-top: 2px; }
+.sel-slot > .octicon { color: var(--fgColor-success); }
+.sel-slot .sel, .sel-row > .sel { position: absolute; opacity: 0; }
+.sel-slot .sel { inset: 0; }
+.sel-row { position: relative; }
+.sel-row > .sel { left: 0; top: 7px; z-index: 1; }
+.ticket:hover .sel, .sel-row:hover > .sel, .sel:focus-visible, .sel:checked, .is-selecting .sel-slot .sel, .is-selecting .sel-row > .sel { opacity: 1; }
+.ticket:hover .sel-slot > .octicon, .sel-slot:has(.sel:focus-visible, .sel:checked) > .octicon, .is-selecting .sel-slot > .octicon,
+.sel-row:hover > .item > .octicon:first-child, .sel-row:has(> .sel:focus-visible, > .sel:checked) > .item > .octicon:first-child, .is-selecting .sel-row > .item > .octicon:first-child { visibility: hidden; }
+@media (hover: none) {
+  .sel-slot .sel, .sel-row > .sel { opacity: 1; }
+  .sel-slot > .octicon, .sel-row > .item > .octicon:first-child { visibility: hidden; }
+}
+.ticket.is-selected, .sel-row.is-selected > .item { background: var(--bgColor-accent-muted); }
+.starting { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; color: var(--fgColor-accent); font-size: 12px; white-space: nowrap; }
+.starting .octicon { width: 12px; height: 12px; }
+
+.bulkbar {
+  position: fixed; z-index: 20; left: 50%; bottom: 16px; transform: translateX(-50%); max-width: calc(100vw - 24px);
+  display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; border-radius: 10px;
+  background: var(--bgColor-default); box-shadow: var(--shadow-floating); font-size: 13px; white-space: nowrap;
+}
+.bulkbar[hidden] { display: none; }
+.bulk-count { color: var(--fgColor-muted); margin-right: 4px; }
+.bulk-count b { color: var(--fgColor-default); }
+.bulkbar .btn-primary .octicon { color: var(--fgColor-onEmphasis); }
+.is-selecting #home { padding-bottom: 72px; }
+.is-selecting .toast { bottom: 68px; }
+@media (max-width: 420px) {
+  .bulkbar { left: 8px; right: 8px; transform: none; max-width: none; }
+  .bulk-count { flex: 1; }
+}
+/* The lists sit flush against their box edges, so the last triage row follows the box's rounded corner. */
+.tickets > li:last-child { border-radius: 0 0 11px 11px; }
+@media (max-width: 480px) { .composer-hint { display: none; } }

@@ -7,11 +7,16 @@ const exec = promisify(execFile);
 const redact = text => String(text).replace(/\b(?:gh[pousr]_[\w]+|github_pat_[\w]+)\b/g, "[redacted]").slice(0, 1200);
 const env = () => ({ ...process.env, GH_PROMPT_DISABLED: "1", GH_PAGER: "", GH_HOST: "github.com", NO_COLOR: "1" });
 
-export async function runGh(args, { json = true } = {}) {
+export async function runGh(args, { json = true, input = null } = {}) {
     try {
-        const result = await exec("gh", args, {
+        const pending = exec("gh", args, {
             cwd: repoRoot, windowsHide: true, encoding: "utf8", timeout: 45_000, maxBuffer: 16 * 1024 * 1024, env: env(),
         });
+        // Request bodies go over stdin (`--input -`) so long comments never hit command-line length limits.
+        // gh can exit before draining stdin (auth failure, timeout); swallow EPIPE so the exit code reports it instead of crashing.
+        pending.child.stdin?.on("error", () => {});
+        if (input !== null) pending.child.stdin.end(input); else pending.child.stdin?.end();
+        const result = await pending;
         return json ? JSON.parse(result.stdout) : result.stdout;
     } catch (error) {
         if (error.code === "ENOENT") throw new TeamLoadError("missing_gh", "GitHub CLI (gh) is not installed or is not on PATH.");
@@ -50,16 +55,19 @@ const infoQuery = `query($owner:String!,$name:String!){repository(owner:$owner,n
   suggestedActors(capabilities:[CAN_BE_ASSIGNED],first:100){nodes{__typename login avatarUrl(size:64) ... on User{name}}}
 }}`;
 const actorFields = "login avatarUrl(size:64) ... on User{name}";
+const commentFields = `databaseId url createdAt bodyHTML viewerCanDelete viewerDidAuthor author{${actorFields}}`;
 const detailQuery = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
   issueOrPullRequest(number:$number){
     __typename
     ... on Issue{number title url state stateReason createdAt updatedAt bodyHTML author{${actorFields}} ${labelFields}
       assignees(first:20){nodes{login avatarUrl(size:64) name}}
-      comments(last:30){totalCount nodes{url createdAt bodyHTML author{${actorFields}}}}}
+      comments(last:30){totalCount nodes{${commentFields}}}}
     ... on PullRequest{number title url state isDraft merged createdAt updatedAt bodyHTML author{${actorFields}} ${labelFields}
       assignees(first:20){nodes{login avatarUrl(size:64) name}}
-      comments(last:30){totalCount nodes{url createdAt bodyHTML author{${actorFields}}}}}
+      comments(last:30){totalCount nodes{${commentFields}}}}
   }}}`;
+const repoLabelsQuery = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){
+  labels(first:100,orderBy:{field:NAME,direction:ASC}){totalCount nodes{name color description}}}}`;
 
 // Activity history for the momentum chart: lightweight reads, newest first, so paging can stop at the window start.
 const historyCommitsQuery = `query($owner:String!,$name:String!,$since:GitTimestamp!,$after:String){repository(owner:$owner,name:$name){
@@ -127,7 +135,7 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
         try {
             try { return await run(args, options); }
             catch (error) {
-                const write = args.includes("--method") || args[0] === "issue";
+                const write = args.includes("--method") || args[0] === "issue" || args[0] === "pr";
                 if (write || !/HTTP 50[234]|timed out|ETIMEDOUT|ECONNRESET/i.test(error.message)) throw error;
                 try { log(`Retrying a transient GitHub read once: ${error.message}`); } catch {}
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -291,7 +299,7 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
             createdAt: node.createdAt, updatedAt: node.updatedAt, author: actor(node.author), labels: labels(node.labels),
             assignees: (node.assignees?.nodes ?? []).map(actor).filter(Boolean),
             bodyHTML: node.bodyHTML || "",
-            comments: { total: node.comments?.totalCount ?? 0, nodes: (node.comments?.nodes ?? []).map(comment => ({ url: comment.url, createdAt: comment.createdAt, bodyHTML: comment.bodyHTML || "", author: actor(comment.author) })) },
+            comments: { total: node.comments?.totalCount ?? 0, nodes: (node.comments?.nodes ?? []).map(comment => ({ id: comment.databaseId ?? null, url: comment.url, createdAt: comment.createdAt, bodyHTML: comment.bodyHTML || "", author: actor(comment.author), canDelete: comment.viewerCanDelete === true && comment.viewerDidAuthor === true })) },
         };
     }
 
@@ -299,24 +307,28 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
     async function readIssue({ repository, number }) {
         split(repository);
         const issue = await limited(["api", "--hostname", "github.com", `repos/${repository}/issues/${number}`]);
-        return { isPr: !!issue.pull_request, state: issue.state, assignees: (issue.assignees ?? []).map(user => canonLogin(user.login)).filter(Boolean) };
+        return { isPr: !!issue.pull_request, merged: !!issue.pull_request?.merged_at, state: issue.state, labels: (issue.labels ?? []).map(label => String(label.name)), assignees: (issue.assignees ?? []).map(user => canonLogin(user.login)).filter(Boolean) };
     }
 
     const handle = login => login === AGENT ? "@copilot" : login;
-    async function editAssignee({ repository, number, login }, flag) {
+    const api = (method, path, body) => limited(["api", "--hostname", "github.com", "--method", method, path, ...(body ? ["--input", "-"] : [])], body ? { input: JSON.stringify(body) } : {});
+    // `gh issue edit` is what starts the Copilot coding agent; PR assignees go through REST, which `gh issue edit` does not cover.
+    async function editAssignee({ repository, number, login, isPr = false }, flag) {
         split(repository);
-        await limited(["issue", "edit", String(number), "--repo", repository, flag, handle(login)], { json: false });
+        if (isPr) await api(flag === "--add-assignee" ? "POST" : "DELETE", `repos/${repository}/issues/${number}/assignees`, { assignees: [login] });
+        else await limited(["issue", "edit", String(number), "--repo", repository, flag, handle(login)], { json: false });
     }
 
     // `additional: false` is the triage guard (only an unowned issue can be claimed). `additional: true` adds
     // alongside existing assignees and is a no-op when the login is already assigned.
-    async function assign({ repository, number, login, additional = false }) {
+    async function assign({ repository, number, login, additional = false, issuesOnly = false }) {
         const before = await readIssue({ repository, number });
-        if (before.isPr) throw new TeamLoadError("invalid_input", "Only issues can be assigned from Team Load.");
+        if (before.isPr && issuesOnly) throw new TeamLoadError("invalid_input", `${repository}#${number} is a pull request. Sessions can only be started for issues.`);
+        if (before.isPr && (login === AGENT || !additional)) throw new TeamLoadError("invalid_input", login === AGENT ? "Copilot can only be assigned to issues." : "Only issues can be triaged from Team Load.");
         if (before.state !== "open") throw new TeamLoadError("conflict", `${repository}#${number} is closed.`);
         if (additional && before.assignees.includes(login)) return { assignees: before.assignees, added: false };
         if (!additional && before.assignees.length) throw new TeamLoadError("conflict", `${repository}#${number} is already assigned to ${before.assignees.map(l => l === AGENT ? "Copilot" : `@${l}`).join(", ")}.`);
-        await editAssignee({ repository, number, login }, "--add-assignee");
+        await editAssignee({ repository, number, login, isPr: before.isPr }, "--add-assignee");
         const after = await readIssue({ repository, number });
         if (!after.assignees.includes(login)) throw new TeamLoadError("github_error", `GitHub accepted the change but ${login === AGENT ? "Copilot" : `@${login}`} is not assigned to ${repository}#${number}. Copilot may not be enabled for this repository.`);
         return { assignees: after.assignees, added: true };
@@ -325,7 +337,7 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
     async function unassign({ repository, number, login }) {
         const before = await readIssue({ repository, number });
         if (!before.assignees.includes(login)) return { assignees: before.assignees };
-        await editAssignee({ repository, number, login }, "--remove-assignee");
+        await editAssignee({ repository, number, login, isPr: before.isPr }, "--remove-assignee");
         const after = await readIssue({ repository, number });
         if (after.assignees.includes(login)) throw new TeamLoadError("github_error", `Could not unassign ${login} from ${repository}#${number}.`);
         return { assignees: after.assignees };
@@ -348,5 +360,70 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
         }
     }
 
-    return { fetchRepo, history, repoInfo, profile, remember, me, detail, readIssue, assign, unassign, reassign };
+    const restComment = c => ({
+        id: c.id, url: c.html_url, createdAt: c.created_at, bodyHTML: c.body_html || "", canDelete: true,
+        author: actor(c.user ? { login: c.user.login, avatarUrl: c.user.avatar_url } : null),
+    });
+
+    async function comment({ repository, number, body }) {
+        split(repository);
+        const created = await limited(["api", "--hostname", "github.com", "--method", "POST", "-H", "Accept: application/vnd.github.html+json",
+            `repos/${repository}/issues/${number}/comments`, "--input", "-"], { input: JSON.stringify({ body }) });
+        return restComment(created);
+    }
+
+    // Only the viewer's own comments, and only on the item the canvas is showing.
+    async function deleteComment({ repository, number, commentId }) {
+        split(repository);
+        const path = `repos/${repository}/issues/comments/${commentId}`;
+        const existing = await limited(["api", "--hostname", "github.com", path]);
+        if (!String(existing.issue_url ?? "").toLowerCase().endsWith(`/repos/${repository.toLowerCase()}/issues/${number}`)) {
+            throw new TeamLoadError("invalid_input", `That comment is not on ${repository}#${number}.`);
+        }
+        if (canonLogin(existing.user?.login) !== await me()) throw new TeamLoadError("permission_denied", "You can only delete your own comments.");
+        await limited(["api", "--hostname", "github.com", "--method", "DELETE", path], { json: false });
+        return { deleted: commentId };
+    }
+
+    const labelCache = new Map();
+    async function repoLabels(repository, { force = false } = {}) {
+        const [owner, name] = split(repository);
+        const cached = labelCache.get(repository.toLowerCase());
+        if (cached && !force && now() - cached.at < 5 * 60_000) return cached.labels;
+        const data = await gql(repoLabelsQuery, { owner, name });
+        const list = (data.repository?.labels?.nodes ?? []).map(label => ({ ...labels({ nodes: [label] })[0], description: label.description || "" }));
+        labelCache.set(repository.toLowerCase(), { at: now(), labels: list });
+        return list;
+    }
+
+    // Labels are checked against the repository's list first, because POSTing an unknown name would create a new label.
+    async function editLabel({ repository, number, label, add }) {
+        const known = (await repoLabels(repository)).find(l => l.name.toLowerCase() === label.toLowerCase())
+            ?? (add ? (await repoLabels(repository, { force: true })).find(l => l.name.toLowerCase() === label.toLowerCase()) : null);
+        if (add && !known) throw new TeamLoadError("invalid_input", `${repository} has no label named "${label}".`);
+        const name = known?.name ?? label;
+        const before = await readIssue({ repository, number });
+        const has = before.labels.some(l => l.toLowerCase() === name.toLowerCase());
+        if (add !== has) {
+            if (add) await api("POST", `repos/${repository}/issues/${number}/labels`, { labels: [name] });
+            else await api("DELETE", `repos/${repository}/issues/${number}/labels/${encodeURIComponent(name)}`);
+        }
+        const after = await readIssue({ repository, number });
+        if (after.labels.some(l => l.toLowerCase() === name.toLowerCase()) !== add) throw new TeamLoadError("github_error", `Could not ${add ? "add" : "remove"} the ${name} label.`);
+        const colors = new Map((await repoLabels(repository)).map(l => [l.name.toLowerCase(), l.color]));
+        return { labels: after.labels.map(n => ({ name: n, color: colors.get(n.toLowerCase()) ?? "8c959f" })) };
+    }
+
+    async function setState({ repository, number, state }) {
+        const before = await readIssue({ repository, number });
+        if (before.merged) throw new TeamLoadError("conflict", `${repository}#${number} is merged.`);
+        if (before.state !== state) {
+            await limited([before.isPr ? "pr" : "issue", state === "closed" ? "close" : "reopen", String(number), "--repo", repository], { json: false });
+            const after = await readIssue({ repository, number });
+            if (after.state !== state) throw new TeamLoadError("github_error", `Could not ${state === "closed" ? "close" : "reopen"} ${repository}#${number}.`);
+        }
+        return { itemState: state };
+    }
+
+    return { fetchRepo, history, repoInfo, profile, remember, me, detail, readIssue, assign, unassign, reassign, comment, deleteComment, repoLabels, editLabel, setState };
 }

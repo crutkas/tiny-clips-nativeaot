@@ -54,6 +54,26 @@ let pickQ = "";
 const busy = new Set(); // item keys mid-write
 let lastError = null;
 let movingIssue = null;
+const drafts = new Map();     // item key -> unsent comment text
+const labelLists = new Map(); // lower(repo) -> labels[] | { error }
+let labelQ = "";
+const inDetail = k => k.startsWith("detail:") || k.startsWith("labels:");
+// Bulk "start local Copilot sessions": selected issue keys, and keys whose sessions were just requested.
+const MAX_BATCH = 10;
+const STARTING_TTL = 15 * 60e3;
+const selected = new Set();
+let bulkBusy = false;
+const starting = (() => {
+    try { return new Map(Object.entries(JSON.parse(localStorage.getItem("team-load-starting") ?? "{}")).filter(([, t]) => Date.now() - t < STARTING_TTL)); }
+    catch { return new Map(); }
+})();
+const saveStarting = () => { try { localStorage.setItem("team-load-starting", JSON.stringify(Object.fromEntries(starting))); } catch {} };
+const isStarting = key => Date.now() - (starting.get(key) ?? 0) < STARTING_TTL;
+const startingHTML = key => isStarting(key) ? `<span class="starting" title="A local Copilot session was requested">${icon("sync")}Session starting</span>` : "";
+function selBox(key, title) {
+    const n = splitKey(key).number;
+    return `<input type="checkbox" class="sel" data-select="${esc(key)}" aria-label="Select #${n} ${esc(title)}"${selected.has(key) ? " checked" : ""}${busy.has(key) || bulkBusy ? " disabled" : ""}>`;
+}
 
 function compute() {
     if (!S) return;
@@ -107,6 +127,7 @@ function paintLabels(scope) {
         el.style.setProperty("color", dark ? `rgb(${Math.min(255, r + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)})` : lum > 0.6 ? "#1f2328" : "#fff");
         el.style.setProperty("border-color", dark ? `rgba(${r},${g},${b},.3)` : "transparent");
     }
+    for (const el of scope.querySelectorAll(".label-dot[data-color]")) el.style.setProperty("background", `#${el.dataset.color}`);
 }
 
 function kindIcon(item) {
@@ -165,10 +186,11 @@ function itemsHTML(p, { movable = false } = {}) {
     <ul class="items">${p.items.map(i => {
         const key = keyOf(i);
         const canMove = movable && i.kind === "issue";
-        return `<li><a class="item" href="${esc(i.url)}" data-item="${esc(key)}" draggable="${canMove && !busy.has(key)}"${canMove ? ` data-move-key="${esc(key)}" data-move-from="${esc(p.login)}" aria-describedby="move-help" aria-busy="${busy.has(key)}"` : ""}>
+        const canSelect = movable && i.kind === "issue";
+        return `<li${canSelect ? ` class="sel-row${selected.has(key) ? " is-selected" : ""}"` : ""}>${canSelect ? selBox(key, i.title) : ""}<a class="item" href="${esc(i.url)}" data-item="${esc(key)}" draggable="${canMove && !busy.has(key)}"${canMove ? ` data-move-key="${esc(key)}" data-move-from="${esc(p.login)}" aria-describedby="move-help" aria-busy="${busy.has(key)}"` : ""}>
       ${kindIcon(i)}
       <span class="item-title">${esc(i.title)}</span>
-      <span class="item-meta">${esc(shortRepo(i.repository))} #${i.number} · ${ago(i.updatedAt)}</span></a></li>`;
+      <span class="item-meta">${startingHTML(key)}${esc(shortRepo(i.repository))} #${i.number} · ${ago(i.updatedAt)}</span></a></li>`;
     }).join("")}</ul>`;
 }
 
@@ -222,9 +244,11 @@ function pickListHTML(key) {
     const q = pickQ.trim().replace(/^@/, "").toLowerCase();
     const match = p => !q || `${p.login} ${p.name}`.toLowerCase().includes(q);
     const taken = assignedTo(key);
+    // Copilot and "start a session" only make sense for issues.
+    const pr = route.item === key && route.data?.kind === "pr";
     const { humans: allHumans, agent: maybeAgent } = sortForAssign(people);
     const humans = allHumans.filter(p => !taken.has(canonLogin(p.login)));
-    const agent = maybeAgent && !taken.has(canonLogin(maybeAgent.login)) ? maybeAgent : null;
+    const agent = !pr && maybeAgent && !taken.has(canonLogin(maybeAgent.login)) ? maybeAgent : null;
     const row = (p, sub) => {
         const t = tone(p.items.length, { agent: p.agent, limit: limit() });
         return `<li><button class="pick" type="button" data-assign="${esc(p.login)}" data-key="${esc(key)}" aria-label="Assign to ${esc(p.name)}, ${p.items.length} open, ${esc(t.label)}">
@@ -234,7 +258,7 @@ function pickListHTML(key) {
     };
     let html = humans.filter(match).map(p => row(p)).join("");
     if (agent && match(agent)) html += `<li class="pick-sep" role="presentation"></li>${row(agent, "agent")}`;
-    if (!q || "start a session myself me".includes(q)) html += `<li class="pick-sep" role="presentation"></li><li><button class="pick pick-plain" type="button" data-session="${esc(key)}">${icon("play")}<span class="pick-name"><span class="n">Start a session myself</span></span></button></li>`;
+    if (!pr && (!q || "start a session myself me".includes(q))) html += `<li class="pick-sep" role="presentation"></li><li><button class="pick pick-plain" type="button" data-session="${esc(key)}">${icon("play")}<span class="pick-name"><span class="n">Start a session myself</span></span></button></li>`;
     return html || `<li class="sp-empty">No one matches</li>`;
 }
 function pickerHTML(key) {
@@ -263,11 +287,11 @@ function renderTriage() {
     el.innerHTML = unowned.map(it => {
         const key = keyOf(it);
         const open = openPicker === key;
-        return `<li class="ticket${open ? " is-picking" : ""}${busy.has(key) ? " is-busy" : ""}" data-key="${esc(key)}">
-      ${icon("issue-opened")}
+        return `<li class="ticket${open ? " is-picking" : ""}${busy.has(key) ? " is-busy" : ""}${selected.has(key) ? " is-selected" : ""}" data-key="${esc(key)}">
+      <span class="sel-slot">${icon("issue-opened")}${selBox(key, it.title)}</span>
       <div class="ticket-body">
         <a class="ticket-title" href="${esc(it.url)}" data-item="${esc(key)}" title="${esc(it.title)}">${esc(it.title)}</a>
-        <div class="ticket-meta"><span>${esc(shortRepo(it.repository))} #${it.number} · ${ago(it.updatedAt)}</span>${it.labels.slice(0, 2).map(labelHTML).join("")}</div>
+        <div class="ticket-meta">${startingHTML(key)}<span>${esc(shortRepo(it.repository))} #${it.number} · ${ago(it.updatedAt)}</span>${it.labels.slice(0, 2).map(labelHTML).join("")}</div>
       </div>
       <div class="ticket-actions">
         <button class="btn-icon tip is-assign" type="button" data-open-picker="${esc(key)}" aria-expanded="${open}" aria-label="Assign">${icon("person-add")}</button>
@@ -278,6 +302,67 @@ function renderTriage() {
     }).join("");
     paintLabels(el);
     wirePicker(el);
+    renderBulk();
+}
+
+// ---- Bulk selection ----
+function selectableTitles() {
+    const titles = new Map(unowned.map(i => [keyOf(i), i.title]));
+    for (const p of people) for (const i of p.items) if (i.kind === "issue" && !titles.has(keyOf(i))) titles.set(keyOf(i), i.title);
+    return titles;
+}
+function renderBulk() {
+    const all = $("triage-all");
+    const keys = unowned.map(keyOf);
+    const on = keys.filter(k => selected.has(k)).length;
+    all.hidden = !keys.length;
+    all.checked = !!keys.length && on === keys.length;
+    all.indeterminate = on > 0 && on < keys.length;
+    all.disabled = bulkBusy;
+    document.body.classList.toggle("is-selecting", selected.size > 0);
+    const bar = $("bulkbar");
+    const n = selected.size;
+    bar.hidden = !n;
+    if (!n) return;
+    const over = n > MAX_BATCH;
+    bar.innerHTML = `<span class="bulk-count"><b>${n}</b> selected${over ? ` · max ${MAX_BATCH}` : ""}</span>
+      <button class="btn btn-invisible" type="button" data-bulk="clear"${bulkBusy ? " disabled" : ""}>Clear</button>
+      <button class="btn btn-primary" type="button" data-bulk="start"${over || bulkBusy ? " disabled" : ""}>${icon("copilot")}${bulkBusy ? "Starting…" : `Start ${n} Copilot session${n === 1 ? "" : "s"}`}</button>`;
+}
+function setSelected(keys, on) {
+    for (const key of keys) on ? selected.add(key) : selected.delete(key);
+    renderRoster();
+    renderTriage();
+    fitNow();
+}
+function pruneSelection() {
+    const titles = selectableTitles();
+    for (const key of selected) if (!titles.has(key)) selected.delete(key);
+}
+async function startSessions() {
+    if (bulkBusy || !selected.size || selected.size > MAX_BATCH) return;
+    const titles = selectableTitles();
+    const keys = [...selected].filter(k => titles.has(k));
+    if (!keys.length) return;
+    hideToast();
+    bulkBusy = true;
+    keys.forEach(k => busy.add(k));
+    renderAll();
+    try {
+        const result = await post("start_sessions", { items: keys.map(k => ({ ...splitKey(k), title: titles.get(k) })) });
+        S = result.state;
+        const now = Date.now();
+        keys.forEach(k => { starting.set(k, now); selected.delete(k); });
+        saveStarting();
+        toast(`Asked Copilot to start ${plural(keys.length, "session")}`);
+        if (result.login) flash(canonLogin(result.login));
+    } catch (error) {
+        toast(esc(error.message), { error: true });
+    } finally {
+        bulkBusy = false;
+        keys.forEach(k => busy.delete(k));
+        renderAll();
+    }
 }
 
 function wirePicker(scope) {
@@ -304,6 +389,7 @@ new ResizeObserver(() => fitNow()).observe($("roster"));
 function renderAll() {
     if (!S) return;
     compute();
+    pruneSelection();
     renderMeta();
     renderRoster();
     renderTriage();
@@ -382,7 +468,7 @@ async function assign(key, login, { session = false, restore = false } = {}) {
     const ref = splitKey(key);
     const viewing = route.item === key && route.data && !route.data.error ? route.data : null;
     // Triage keeps the server's "already assigned" guard; only an issue seen with assignees (or an undo) may be added to.
-    const extra = restore || viewing?.assignees.length ? { additional: true } : {};
+    const extra = restore || viewing?.assignees.length || viewing?.kind === "pr" ? { additional: true } : {};
     const title = unowned.find(i => keyOf(i) === key)?.title ?? viewing?.title ?? "";
     const who = whoLabel(login);
     busy.add(key);
@@ -439,6 +525,100 @@ async function unassign(key, login, { removal = false } = {}) {
     }
 }
 const removeAssignee = (key, login) => unassign(key, login, { removal: true });
+
+// ---- Detail-view edits: comments, labels, close/reopen ----
+const viewingData = key => route.item === key && route.data && !route.data.error ? route.data : null;
+function lock(key) { busy.add(key); renderDetailSide(); }
+function unlock(key) { busy.delete(key); if (route.item === key) renderDetailSide(); }
+
+async function postComment({ thenState = null } = {}) {
+    const key = route.item;
+    if (!key || !viewingData(key) || busy.has(key)) return;
+    const body = $("composer-text")?.value ?? "";
+    if (!body.trim()) { if (thenState) await setItemState(key, thenState); return; }
+    hideToast();
+    lock(key);
+    const number = splitKey(key).number;
+    try {
+        const { comment } = await post("comment", { ...splitKey(key), body });
+        drafts.delete(key);
+        if (route.item === key) $("composer-text").value = "";
+        unlock(key);
+        const d = viewingData(key);
+        if (d) { d.comments.nodes.push(comment); d.comments.total++; renderDetail(); }
+        toast(`Comment posted on <b>#${number}</b>`, { undo: () => {
+            if (!drafts.get(key)?.trim()) drafts.set(key, body);
+            removeComment(key, comment.id, { restored: true });
+        } });
+        if (thenState) await setItemState(key, thenState); else refreshItem(key);
+    } catch (error) {
+        unlock(key);
+        toast(esc(error.message), { error: true });
+    }
+}
+
+async function removeComment(key, commentId, { restored = false } = {}) {
+    if (busy.has(key)) return;
+    hideToast();
+    lock(key);
+    try {
+        await post("delete_comment", { ...splitKey(key), commentId });
+        unlock(key);
+        const d = viewingData(key);
+        if (d) {
+            const i = d.comments.nodes.findIndex(c => c.id === commentId);
+            if (i >= 0) { d.comments.nodes.splice(i, 1); d.comments.total = Math.max(0, d.comments.total - 1); }
+            renderDetail();
+        }
+        toast(restored ? "Comment removed, text is back in the box" : "Comment deleted");
+        refreshItem(key);
+    } catch (error) {
+        unlock(key);
+        toast(esc(error.message), { error: true });
+    }
+}
+
+async function setItemState(key, to, { undo = false } = {}) {
+    if (busy.has(key)) return;
+    hideToast();
+    lock(key);
+    const number = splitKey(key).number;
+    try {
+        const result = await post("set_item_state", { ...splitKey(key), state: to });
+        S = result.state;
+        busy.delete(key);
+        const d = viewingData(key);
+        if (d) { d.state = to; d.stateReason = null; }
+        renderAll();
+        if (route.item === key) renderDetail();
+        toast(`${to === "closed" ? "Closed" : "Reopened"} <b>#${number}</b>`, undo ? {} : { undo: () => setItemState(key, to === "closed" ? "open" : "closed", { undo: true }) });
+        refreshItem(key);
+    } catch (error) {
+        unlock(key);
+        toast(esc(error.message), { error: true });
+        refreshItem(key);
+    }
+}
+
+async function toggleLabel(key, name, { undo = false } = {}) {
+    const d = viewingData(key);
+    if (!d || busy.has(key)) return;
+    const add = !d.labels.some(l => l.name.toLowerCase() === name.toLowerCase());
+    lock(key);
+    try {
+        const result = await post("label", { ...splitKey(key), label: name, add });
+        S = result.state;
+        busy.delete(key);
+        const now = viewingData(key);
+        if (now) now.labels = result.labels;
+        renderAll();
+        toast(`${add ? "Added" : "Removed"} label <b>${esc(name)}</b>`, undo ? {} : { undo: () => toggleLabel(key, name, { undo: true }) });
+        refreshItem(key);
+    } catch (error) {
+        unlock(key);
+        toast(esc(error.message), { error: true });
+    }
+}
 
 async function reassignIssue(key, from, login, { undo = false } = {}) {
     if (busy.has(key) || from === login) return;
@@ -735,11 +915,20 @@ function holdFocus() {
     const active = document.activeElement;
     const side = detailEl.querySelector(".dv-side");
     const keep = active?.id === "dv-back" ? "#dv-back"
-        : side?.contains(active) ? (active.classList.contains("pick-q") ? ".dv-side .pick-q" : ".dv-side [data-open-picker]")
+        : active?.id === "composer-text" ? "#composer-text"
+        : side?.contains(active) ? (active.classList.contains("pick-q") ? ".dv-side .pick-q"
+            : active.classList.contains("label-q") ? ".dv-side .label-q"
+            : active.dataset.label ? `.dv-side [data-label="${CSS.escape(active.dataset.label)}"]`
+            : active.dataset.openPicker ? `.dv-side [data-open-picker="${CSS.escape(active.dataset.openPicker)}"]`
+            : ".dv-side [data-open-picker]")
         : null;
+    const selection = active?.id === "composer-text" ? [active.selectionStart, active.selectionEnd] : null;
     return () => {
         if (!keep) return;
-        [keep, ".dv-side [data-open-picker]", ".dv-side"].map(s => detailEl.querySelector(s)).find(el => el && !el.disabled)?.focus();
+        const el = [keep, ".dv-side [data-open-picker]", ".dv-side"].map(s => detailEl.querySelector(s)).find(el => el && !el.disabled);
+        if (!el || el === document.activeElement) return;
+        el.focus({ preventScroll: true });
+        if (selection && el.id === "composer-text") el.setSelectionRange(...selection);
     };
 }
 
@@ -749,28 +938,123 @@ function renderDetailSide() {
     if (!side || !d || d.error || !route.item) return;
     const restoreFocus = holdFocus();
     const key = route.item;
-    const editable = d.kind === "issue" && d.state === "open" && S?.tracking.repos.some(r => r.toLowerCase() === d.repository.toLowerCase());
+    const tracked = isTracked(d);
+    const editable = tracked && d.state === "open";
     const pickerOpen = openPicker === `detail:${key}`;
+    const labelsOpen = openPicker === `labels:${key}`;
     const off = busy.has(key) ? " disabled" : "";
     side.innerHTML = `
       <div class="side-sec"><h3>Assignees</h3>
         ${peopleList(d.assignees, { editable, key, locked: busy.has(key) })}
         ${editable ? `<div class="side-actions">
           <button class="btn" type="button" data-open-picker="detail:${esc(key)}" aria-expanded="${pickerOpen}"${off}>${icon("person-add")}${d.assignees.length ? "Add" : "Assign"}</button>
-          ${d.assignees.some(a => a.agent) ? "" : `<button class="btn" type="button" data-assign="${AGENT}" data-key="${esc(key)}"${off}>${icon("copilot")}Copilot</button>`}
+          ${d.kind === "pr" || d.assignees.some(a => a.agent) ? "" : `<button class="btn" type="button" data-assign="${AGENT}" data-key="${esc(key)}"${off}>${icon("copilot")}Copilot</button>`}
           ${pickerOpen ? pickerHTML(key) : ""}
         </div>` : ""}
       </div>
-      <div class="side-sec"><h3>Labels</h3>${d.labels.length ? `<div class="side-labels">${d.labels.map(labelHTML).join("")}</div>` : `<span class="side-empty">None yet</span>`}</div>`;
+      <div class="side-sec">
+        <div class="side-head"><h3>Labels</h3>${tracked ? `<button class="btn-icon tip side-edit" type="button" data-open-picker="labels:${esc(key)}" aria-expanded="${labelsOpen}" aria-label="Edit labels"${off}>${icon("gear")}</button>` : ""}
+          ${labelsOpen ? labelPickerHTML(key) : ""}</div>
+        ${d.labels.length ? `<div class="side-labels">${d.labels.map(labelHTML).join("")}</div>` : `<span class="side-empty">None yet</span>`}
+      </div>`;
     paintLabels(side);
     wirePicker(side);
+    wireLabelPicker(side);
+    syncComposer();
     restoreFocus();
 }
 
-function commentHTML(c, first = false) {
+// Edits are limited to tracked repositories (the server enforces the same rule).
+const isTracked = d => !!d && !d.error && !!S?.tracking.repos.some(r => r.toLowerCase() === d.repository.toLowerCase());
+
+function labelListHTML(key) {
+    const d = route.item === key ? route.data : null;
+    const list = d && labelLists.get(d.repository.toLowerCase());
+    if (!list) return `<li class="sp-empty">Loading labels…</li>`;
+    if (list.error) return `<li class="sp-empty">${esc(list.error)}</li>`;
+    const on = new Set(d.labels.map(l => l.name.toLowerCase()));
+    const q = labelQ.trim().toLowerCase();
+    const rows = list.filter(l => !q || `${l.name} ${l.description}`.toLowerCase().includes(q));
+    if (!rows.length) return `<li class="sp-empty">${list.length ? "No labels match" : "This repository has no labels"}</li>`;
+    const locked = busy.has(key) ? ` aria-disabled="true"` : "";
+    return rows.map(l => {
+        const checked = on.has(l.name.toLowerCase());
+        return `<li><button class="pick pick-label" type="button" role="menuitemcheckbox" aria-checked="${checked}" data-label="${esc(l.name)}" data-key="${esc(key)}"${locked}>
+        <span class="pick-check">${checked ? icon("check") : ""}</span><span class="label-dot" data-color="${esc(l.color)}"></span>
+        <span class="pick-name"><span class="n">${esc(l.name)}</span>${l.description ? `<small>${esc(l.description)}</small>` : ""}</span></button></li>`;
+    }).join("");
+}
+function labelPickerHTML(key) {
+    return `<div class="picker picker-labels" role="dialog" aria-label="Apply labels" data-key="${esc(key)}">
+    <div class="picker-head">Apply labels</div>
+    <div class="sp-search">${icon("search")}<input class="label-q" type="text" placeholder="Filter labels" aria-label="Filter labels" autocomplete="off" value="${esc(labelQ)}"></div>
+    <ul class="pick-list label-list" role="menu">${labelListHTML(key)}</ul>
+  </div>`;
+}
+function refreshLabelList() {
+    const ul = detailEl.querySelector(".label-list");
+    if (!ul || !route.item) return;
+    ul.innerHTML = labelListHTML(route.item);
+    paintLabels(ul);
+}
+function wireLabelPicker(scope) {
+    const input = scope.querySelector(".picker .label-q");
+    if (!input) return;
+    input.addEventListener("input", e => { labelQ = e.target.value; refreshLabelList(); });
+    input.addEventListener("keydown", e => {
+        const first = scope.querySelector(".label-list .pick");
+        if (e.key === "Enter") { e.preventDefault(); first?.click(); }
+        if (e.key === "ArrowDown") { e.preventDefault(); first?.focus(); }
+    });
+}
+async function loadLabels(repository) {
+    const k = repository.toLowerCase();
+    if (Array.isArray(labelLists.get(k))) return;
+    labelLists.delete(k);
+    try { labelLists.set(k, (await post("get_labels", { repository })).labels); }
+    catch (error) { labelLists.set(k, { error: error.message }); }
+    refreshLabelList();
+}
+
+function composerHTML(d) {
+    const pr = d.kind === "pr";
+    const noun = pr ? "pull request" : "issue";
+    const toggle = d.state === "merged" ? ""
+        : d.state === "open"
+            ? `<button class="btn" type="button" id="state-toggle" data-to="closed">${icon(pr ? "git-pull-request-closed" : "issue-closed", "c-close")}<span>Close ${noun}</span></button>`
+            : `<button class="btn" type="button" id="state-toggle" data-to="open">${icon(pr ? "git-pull-request" : "issue-reopened", "c-open")}<span>Reopen ${noun}</span></button>`;
+    return `<form class="composer" id="composer" aria-label="Add a comment">
+      <textarea id="composer-text" rows="4" placeholder="Leave a comment" aria-label="Comment (Markdown supported)"></textarea>
+      <div class="composer-foot">
+        <span class="composer-hint">Markdown supported</span>
+        <span class="composer-actions">${toggle}<button class="btn btn-primary" type="submit" id="composer-send">Comment</button></span>
+      </div>
+    </form>`;
+}
+// Keeps the composer's buttons in step with the draft and any write in flight, without touching the textarea.
+function syncComposer() {
+    const ta = $("composer-text");
+    const d = route.data;
+    if (!ta || !d || d.error) return;
+    const locked = busy.has(route.item);
+    const text = !!ta.value.trim();
+    $("composer-send").disabled = locked || !text;
+    ta.readOnly = locked;
+    const toggle = $("state-toggle");
+    if (toggle) {
+        toggle.disabled = locked;
+        const noun = d.kind === "pr" ? "pull request" : "issue";
+        toggle.querySelector("span").textContent = toggle.dataset.to === "closed"
+            ? (text ? "Close with comment" : `Close ${noun}`)
+            : (text ? "Reopen with comment" : `Reopen ${noun}`);
+    }
+}
+
+function commentHTML(c, first = false, deletable = false) {
     const who = c.author ? (c.author.agent ? "Copilot" : c.author.login) : "ghost";
+    const del = deletable && c.canDelete && c.id ? `<button class="btn-icon tip c-del" type="button" data-delete-comment="${esc(c.id)}" aria-label="Delete comment">${icon("trash")}</button>` : "";
     return `<article class="comment${first ? " is-first" : ""}">
-      <header class="comment-head">${avatarHTML({ ...(c.author ?? { login: "ghost" }), name: who }, 20)}<b>${esc(who)}</b>${first ? "opened" : "commented"}<span class="when" title="${esc(new Date(c.createdAt).toLocaleString())}">${ago(c.createdAt)} ago</span></header>
+      <header class="comment-head">${avatarHTML({ ...(c.author ?? { login: "ghost" }), name: who }, 20)}<b>${esc(who)}</b>${first ? "opened" : "commented"}<span class="when" title="${esc(new Date(c.createdAt).toLocaleString())}">${ago(c.createdAt)} ago</span>${del}</header>
       <div class="comment-body markdown-body" data-html-slot></div>
     </article>`;
 }
@@ -812,12 +1096,15 @@ function buildDetail() {
         <div class="dv-main">
           ${commentHTML({ author: d.author, createdAt: d.createdAt }, true)}
           ${hidden ? `<div class="more-comments">${icon("comment")}<span>${plural(hidden, "earlier comment")} on <a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">GitHub</a></span></div>` : ""}
-          ${comments.map(c => commentHTML(c)).join("")}
+          ${comments.map(c => commentHTML(c, false, isTracked(d))).join("")}
+          ${isTracked(d) ? composerHTML(d) : ""}
         </div>
       </div>`;
     const slots = detailEl.querySelectorAll("[data-html-slot]");
     fill(slots[0], d.bodyHTML);
     comments.forEach((c, i) => fill(slots[i + 1], c.bodyHTML));
+    const ta = $("composer-text");
+    if (ta) ta.value = drafts.get(route.item) ?? "";
     renderDetailSide();
 }
 
@@ -959,7 +1246,7 @@ document.addEventListener("click", event => {
     const link = event.target.closest("a[data-item], a[data-person]");
     if (link && plainClick(event)) {
         event.preventDefault();
-        if (openPicker && !openPicker.startsWith("detail:")) openPicker = null;
+        if (openPicker && !inDetail(openPicker)) openPicker = null;
         if (link.dataset.item) openDetail(link.dataset.item); else openPerson(link.dataset.person);
         return;
     }
@@ -968,6 +1255,8 @@ document.addEventListener("click", event => {
         if (route.item) renderDetailSide(); else renderTriage();
     }
     const t = event.target.closest("button");
+    if (t?.dataset.bulk === "start") return startSessions();
+    if (t?.dataset.bulk === "clear") { setSelected([...selected], false); return $("triage-all").hidden ? null : $("triage-all").focus(); }
     if (!t || t.disabled) return;
     if (t.id === "undo") {
         const fn = undoAction;
@@ -1009,15 +1298,57 @@ document.addEventListener("click", event => {
         const next = t.dataset.openPicker;
         openPicker = openPicker === next ? null : next;
         pickQ = "";
-        if (next.startsWith("detail:")) renderDetailSide(); else renderTriage();
-        (document.querySelector(".picker .pick-q") ?? document.querySelector(`[data-open-picker="${CSS.escape(next)}"]`))?.focus();
+        labelQ = "";
+        if (inDetail(next)) renderDetailSide(); else renderTriage();
+        if (openPicker?.startsWith("labels:") && route.data && !route.data.error) loadLabels(route.data.repository);
+        (document.querySelector(".picker .pick-q, .picker .label-q") ?? document.querySelector(`[data-open-picker="${CSS.escape(next)}"]`))?.focus();
+        return;
+    }
+    if (t.dataset.label) return toggleLabel(t.dataset.key, t.dataset.label);
+    if (t.id === "state-toggle") return postComment({ thenState: t.dataset.to });
+    if (t.dataset.deleteComment) {
+        // Two-step delete: the first click arms the button, the second deletes.
+        if (t.classList.contains("is-armed")) return removeComment(route.item, Number(t.dataset.deleteComment));
+        t.classList.add("is-armed");
+        t.innerHTML = `${icon("trash")}<span>Delete?</span>`;
+        t.setAttribute("aria-label", "Confirm delete comment");
+        setTimeout(() => { if (t.isConnected) { t.classList.remove("is-armed"); t.innerHTML = icon("trash"); t.setAttribute("aria-label", "Delete comment"); } }, 4000);
         return;
     }
     if (t.dataset.unassign) return removeAssignee(t.dataset.key, t.dataset.unassign);
     if (t.dataset.assign) return assign(t.dataset.key, t.dataset.assign);
     if (t.dataset.session) return assign(t.dataset.session, S?.me, { session: true });
 });
+document.addEventListener("change", event => {
+    const box = event.target;
+    if (box.id === "triage-all") {
+        const keys = unowned.map(keyOf);
+        // Any unowned selection means this click clears; otherwise fill up to the batch cap.
+        if (keys.some(k => selected.has(k))) return setSelected(keys, false);
+        return setSelected(keys.slice(0, Math.max(0, MAX_BATCH - selected.size)), true);
+    }
+    if (!box.dataset?.select) return;
+    const key = box.dataset.select;
+    setSelected([key], box.checked);
+    // Re-rendering replaced the checkbox; keep keyboard focus on the same row.
+    document.querySelector(`#home .sel[data-select="${CSS.escape(key)}"]`)?.focus();
+});
+document.addEventListener("submit", event => {
+    if (event.target.id !== "composer") return;
+    event.preventDefault();
+    postComment();
+});
+document.addEventListener("input", event => {
+    if (event.target.id !== "composer-text" || !route.item) return;
+    drafts.set(route.item, event.target.value);
+    syncComposer();
+});
 document.addEventListener("keydown", event => {
+    if (event.target.id === "composer-text" && event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        postComment();
+        return;
+    }
     const movable = event.target.closest("#roster [data-move-key]");
     if (event.key === " " && movable) {
         event.preventDefault();
@@ -1035,10 +1366,14 @@ document.addEventListener("keydown", event => {
         return;
     }
     if (scope.open) return closeScope();
+    if (selected.size && !openPicker && !route.item && !route.person && !event.target.closest("input, textarea")?.matches(":not(.sel)")) {
+        event.preventDefault();
+        return setSelected([...selected], false);
+    }
     if (openPicker) {
         const key = openPicker;
         openPicker = null;
-        if (key.startsWith("detail:")) renderDetailSide(); else renderTriage();
+        if (inDetail(key)) renderDetailSide(); else renderTriage();
         document.querySelector(`[data-open-picker="${CSS.escape(key)}"]`)?.focus();
         return;
     }

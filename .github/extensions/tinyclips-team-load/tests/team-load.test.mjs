@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
     AGENT, TeamLoadError, canonLogin, cleanTitle, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign,
-    ago, parseItemUrl, normalizeTracking, validateItemRef, validateConfig,
+    ago, parseItemUrl, normalizeTracking, validateItemRef, validateConfig, validateEdit, validateSessionBatch, MAX_SESSION_BATCH,
     MOMENTUM_DAYS, MOMENTUM_METRICS, dailyMomentum, momentumStart, validateMomentumInput,
 } from "../model.mjs";
 import { readConfig, createTrackingStore } from "../state.mjs";
@@ -892,4 +892,192 @@ test("when every repo fails, status is error (not loading) so the UI can show it
     const status = hub.state().repoStatus["o/r"];
     assert.equal(status.status, "error");
     assert.equal(status.error.message, "no access");
+});
+
+
+// ---- Detail-view edits ----
+function editServer({ isPr = false, merged = false, state = "open", labels = ["bug"], commentAuthor = "burkeholland", commentIssue = 5 } = {}) {
+    const item = { state, labels: [...labels] };
+    const { run, calls } = fakeGh({
+        "issues/comments/77": ({ args }) => args.includes("DELETE") ? "" : { issue_url: `https://api.github.com/repos/o/r/issues/${commentIssue}`, user: { login: commentAuthor } },
+        "issues/5/comments": ({ options }) => ({ id: 9, html_url: "u", created_at: iso(1), body_html: `<p>${JSON.parse(options.input).body}</p>`, user: { login: "burkeholland", avatar_url: "a" } }),
+        "issues/5/labels": ({ args, options }) => {
+            if (args.includes("POST")) item.labels.push(...JSON.parse(options.input).labels);
+            else item.labels = item.labels.filter(l => l !== decodeURIComponent(args.at(-1).split("/").pop()));
+            return [];
+        },
+        "issues/5/assignees": () => ({}),
+        "repos/o/r/issues/5": () => ({ state: item.state, pull_request: isPr ? { merged_at: merged ? iso(1) : null } : undefined, labels: item.labels.map(name => ({ name })), assignees: [] }),
+        "api --hostname github.com user": () => ({ login: "BurkeHolland" }),
+        "labels(first": () => ({ data: { repository: { labels: { nodes: [{ name: "bug", color: "d73a4a", description: "Broken" }, { name: "good first issue", color: "7057ff", description: "" }] } } } }),
+        " close 5": () => { item.state = "closed"; return ""; },
+        " reopen 5": () => { item.state = "open"; return ""; },
+    });
+    return { run, calls, item };
+}
+
+test("comment posts the body over stdin and asks for rendered HTML", async () => {
+    const server = editServer();
+    const gh = createGitHub({ run: server.run });
+    const created = await gh.comment({ repository: "o/r", number: 5, body: "Hi `x`" });
+    const call = server.calls.find(args => args.some(a => a.endsWith("/comments")));
+    assert.ok(call.includes("POST") && call.includes("--input") && call.includes("Accept: application/vnd.github.html+json"));
+    assert.equal(created.id, 9);
+    assert.equal(created.canDelete, true);
+    assert.equal(created.bodyHTML, "<p>Hi `x`</p>");
+});
+
+test("deleteComment only removes the viewer's own comment on the same item", async () => {
+    const mine = editServer();
+    assert.deepEqual(await createGitHub({ run: mine.run }).deleteComment({ repository: "o/r", number: 5, commentId: 77 }), { deleted: 77 });
+    assert.ok(mine.calls.some(args => args.includes("DELETE")));
+    const theirs = editServer({ commentAuthor: "someone" });
+    await assert.rejects(createGitHub({ run: theirs.run }).deleteComment({ repository: "o/r", number: 5, commentId: 77 }), error => error.code === "permission_denied");
+    const elsewhere = editServer({ commentIssue: 6 });
+    await assert.rejects(createGitHub({ run: elsewhere.run }).deleteComment({ repository: "o/r", number: 5, commentId: 77 }), error => error.code === "invalid_input");
+    for (const s of [theirs, elsewhere]) assert.ok(!s.calls.some(args => args.includes("DELETE")));
+});
+
+test("editLabel adds and removes known labels, is idempotent, and never creates new ones", async () => {
+    const server = editServer();
+    const gh = createGitHub({ run: server.run });
+    assert.deepEqual(await gh.editLabel({ repository: "o/r", number: 5, label: "Good First Issue", add: true }), { labels: [{ name: "bug", color: "d73a4a" }, { name: "good first issue", color: "7057ff" }] });
+    const writes = () => server.calls.filter(args => args.includes("POST") || args.includes("DELETE")).length;
+    assert.equal(writes(), 1);
+    await gh.editLabel({ repository: "o/r", number: 5, label: "bug", add: true });
+    assert.equal(writes(), 1, "already applied: no write");
+    assert.deepEqual((await gh.editLabel({ repository: "o/r", number: 5, label: "good first issue", add: false })).labels.map(l => l.name), ["bug"]);
+    assert.ok(server.calls.some(args => args.at(-1) === "repos/o/r/issues/5/labels/good%20first%20issue"));
+    await assert.rejects(gh.editLabel({ repository: "o/r", number: 5, label: "made-up", add: true }), error => error.code === "invalid_input");
+    assert.equal(writes(), 2);
+});
+
+test("setState closes and reopens issues and PRs, and refuses merged PRs", async () => {
+    const issue = editServer();
+    const gh = createGitHub({ run: issue.run });
+    assert.deepEqual(await gh.setState({ repository: "o/r", number: 5, state: "closed" }), { itemState: "closed" });
+    assert.ok(issue.calls.some(args => args.join(" ") === "issue close 5 --repo o/r"));
+    await gh.setState({ repository: "o/r", number: 5, state: "closed" });
+    assert.equal(issue.calls.filter(args => args[1] === "close").length, 1, "no-op when already closed");
+    const pr = editServer({ isPr: true });
+    await createGitHub({ run: pr.run }).setState({ repository: "o/r", number: 5, state: "closed" });
+    assert.ok(pr.calls.some(args => args.join(" ") === "pr close 5 --repo o/r"));
+    const merged = editServer({ isPr: true, merged: true, state: "closed" });
+    await assert.rejects(createGitHub({ run: merged.run }).setState({ repository: "o/r", number: 5, state: "open" }), error => error.code === "conflict");
+});
+
+test("PR assignees go through REST, and Copilot or session starts stay issue-only", async () => {
+    let assignees = [];
+    const { run, calls } = fakeGh({
+        "issues/5/assignees": ({ args, options }) => { const [login] = JSON.parse(options.input).assignees; assignees = args.includes("POST") ? [...assignees, login] : assignees.filter(l => l !== login); return {}; },
+        "repos/o/r/issues/5": () => ({ state: "open", pull_request: {}, assignees: assignees.map(login => ({ login })) }),
+    });
+    const gh = createGitHub({ run });
+    assert.deepEqual(await gh.assign({ repository: "o/r", number: 5, login: "jamesmontemagno", additional: true }), { assignees: ["jamesmontemagno"], added: true });
+    assert.ok(!calls.some(args => args[0] === "issue" || args[0] === "pr"));
+    await gh.unassign({ repository: "o/r", number: 5, login: "jamesmontemagno" });
+    assert.deepEqual(assignees, []);
+    await assert.rejects(gh.assign({ repository: "o/r", number: 5, login: AGENT, additional: true }), /only be assigned to issues/);
+    await assert.rejects(gh.assign({ repository: "o/r", number: 5, login: "burkeholland", additional: true, issuesOnly: true }), /Sessions can only be started for issues/);
+});
+
+test("validateEdit checks each edit's fields", () => {
+    const ref = { repository: "o/r", number: 5 };
+    assert.equal(validateEdit({ ...ref, body: "hi" }, "comment").body, "hi");
+    for (const bad of [{ ...ref, body: "  " }, { ...ref, body: "x".repeat(65537) }, { ...ref, body: "x", extra: 1 }]) assert.throws(() => validateEdit(bad, "comment"), error => error.code === "invalid_input");
+    assert.equal(validateEdit({ ...ref, commentId: 3 }, "delete_comment").commentId, 3);
+    assert.throws(() => validateEdit({ ...ref, commentId: "3" }, "delete_comment"));
+    assert.equal(validateEdit({ ...ref, label: "bug", add: false }, "label").add, false);
+    assert.throws(() => validateEdit({ ...ref, label: "bug" }, "label"));
+    assert.equal(validateEdit({ ...ref, state: "closed" }, "set_item_state").state, "closed");
+    assert.throws(() => validateEdit({ ...ref, state: "merged" }, "set_item_state"));
+});
+
+function editHub() {
+    const f = hubFixture();
+    const edits = [];
+    Object.assign(f.github, {
+        comment: async input => { edits.push(["comment", input.repository, input.number]); return { id: 1, bodyHTML: "", createdAt: iso(1), canDelete: true, author: null }; },
+        deleteComment: async input => { edits.push(["delete", input.commentId]); return { deleted: input.commentId }; },
+        repoLabels: async () => [{ name: "bug", color: "d73a4a", description: "" }],
+        editLabel: async input => { edits.push(["label", input.label, input.add]); return { labels: [{ name: input.label, color: "d73a4a" }] }; },
+        setState: async input => { edits.push(["state", input.state]); return { itemState: input.state }; },
+    });
+    return { ...f, edits };
+}
+
+test("detail edits route through the server, stay inside tracked repos, and refresh", async () => {
+    const f = editHub();
+    await f.hub.refresh(); await settle(f.hub);
+    const ctx = { hub: f.hub };
+    assert.equal((await perform(ctx, "comment", { repository: "O/R", number: 5, body: "hi" })).comment.id, 1);
+    await perform(ctx, "delete_comment", { repository: "o/r", number: 5, commentId: 1 });
+    assert.equal((await perform(ctx, "get_labels", { repository: "o/r" })).labels[0].name, "bug");
+    const labelled = await perform(ctx, "label", { repository: "o/r", number: 5, label: "bug", add: true });
+    assert.ok(labelled.state && labelled.labels.length === 1);
+    const closed = await perform(ctx, "set_item_state", { repository: "o/r", number: 5, state: "closed" });
+    assert.equal(closed.itemState, "closed");
+    assert.ok(closed.state);
+    assert.deepEqual(f.edits, [["comment", "o/r", 5], ["delete", 1], ["label", "bug", true], ["state", "closed"]]);
+    for (const [action, input] of [["comment", { body: "x" }], ["delete_comment", { commentId: 1 }], ["label", { label: "bug", add: true }], ["set_item_state", { state: "open" }]]) {
+        await assert.rejects(perform(ctx, action, { repository: "o/other", number: 5, ...input }), error => error.code === "invalid_input");
+    }
+    await assert.rejects(perform(ctx, "get_labels", { repository: "o/other" }), error => error.code === "invalid_input");
+    assert.equal(f.edits.length, 4);
+});
+
+// ---- Bulk local sessions ----
+test("validateSessionBatch requires 1-10 distinct issue refs", () => {
+    assert.deepEqual(validateSessionBatch({ items: [{ repository: "o/r", number: 1, title: "A" }, { repository: "O/R", number: 1 }] }), [{ repository: "o/r", number: 1, title: "A" }]);
+    for (const bad of [{}, { items: [] }, { items: "x" }, { items: [{ repository: "o/r", number: 1 }], extra: 1 }, { items: [{ repository: "o/r", number: 0 }] }, { items: Array.from({ length: MAX_SESSION_BATCH + 1 }, (_, i) => ({ repository: "o/r", number: i + 1 })) }]) {
+        assert.throws(() => validateSessionBatch(bad), error => error.code === "invalid_input");
+    }
+});
+
+test("start_sessions claims every issue and sends one prompt listing them all", async () => {
+    const prompts = [];
+    const f = hubFixture({ sendPrompt: async prompt => prompts.push(prompt), issues: { "o/r": [issueNode(5), issueNode(6, ["jamesmontemagno"])] } });
+    await f.hub.refresh(); await settle(f.hub);
+    const result = await perform({ hub: f.hub }, "start_sessions", { items: [{ repository: "o/r", number: 5, title: "Fix \"it\"" }, { repository: "o/r", number: 6, title: "Other" }] });
+    assert.deepEqual(result.started, [{ repository: "o/r", number: 5 }, { repository: "o/r", number: 6 }]);
+    assert.deepEqual(f.writes, [["assign", "o/r", 5, "burkeholland", "additional"], ["assign", "o/r", 6, "burkeholland", "additional"]]);
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /2 local Copilot coding sessions/);
+    assert.match(prompts[0], /1\. o\/r#5 title="Fix \\"it\\"" url=https:\/\/github\.com\/o\/r\/issues\/5/);
+    assert.match(prompts[0], /2\. o\/r#6 title="Other" url=https:\/\/github\.com\/o\/r\/issues\/6/);
+    assert.ok(result.state.items.find(i => i.number === 6).assignees.includes("burkeholland"));
+});
+
+test("start_sessions rolls back only what it added when the send fails", async () => {
+    const f = hubFixture({ sendPrompt: async () => { throw new Error("offline"); }, issues: { "o/r": [issueNode(5), issueNode(6)] } });
+    await f.hub.refresh(); await settle(f.hub);
+    f.assignees.set("o/r#6", ["burkeholland"]);
+    await assert.rejects(f.hub.startSessions({ items: [{ repository: "o/r", number: 5 }, { repository: "o/r", number: 6 }] }), error => error.code === "session_unavailable" && /undone/.test(error.message));
+    assert.deepEqual(f.writes, [["assign", "o/r", 5, "burkeholland", "additional"], ["unassign", "o/r", 5, "burkeholland"]]);
+    assert.deepEqual(f.assignees.get("o/r#6"), ["burkeholland"], "an existing assignment is left alone");
+});
+
+test("start_sessions is all or nothing when a claim fails, and rejects untracked repos up front", async () => {
+    const prompts = [];
+    const f = hubFixture({ sendPrompt: async prompt => prompts.push(prompt), issues: { "o/r": [issueNode(5), issueNode(6)] } });
+    await f.hub.refresh(); await settle(f.hub);
+    const assign = f.github.assign;
+    f.github.assign = async input => { if (input.number === 6) throw new TeamLoadError("conflict", "o/r#6 is closed."); return assign(input); };
+    await assert.rejects(f.hub.startSessions({ items: [{ repository: "o/r", number: 5 }, { repository: "o/r", number: 6 }] }), error => error.code === "conflict" && /o\/r#6.*no sessions were started/.test(error.message));
+    assert.deepEqual(f.writes, [["assign", "o/r", 5, "burkeholland", "additional"], ["unassign", "o/r", 5, "burkeholland"]]);
+    assert.equal(prompts.length, 0);
+    await assert.rejects(f.hub.startSessions({ items: [{ repository: "o/r", number: 5 }, { repository: "o/other", number: 1 }] }), error => error.code === "invalid_input");
+    assert.equal(f.writes.length, 2, "nothing claimed when a repo is untracked");
+});
+
+test("the action endpoint accepts long comments but caps bodies at 256 KiB", async () => {
+    const f = editHub();
+    await f.hub.refresh(); await settle(f.hub);
+    const server = await startServer(() => ({ hub: f.hub }));
+    try {
+        const nonce = (await (await fetch(server.url)).text()).match(/name="team-load-nonce" content="([^"]+)"/)[1];
+        const call = body => fetch(new URL("/api/action", server.url), { method: "POST", headers: { "content-type": "application/json", "x-team-load-nonce": nonce }, body: JSON.stringify({ action: "comment", input: { repository: "o/r", number: 5, body } }) });
+        assert.equal((await call("x".repeat(60000))).status, 200);
+        assert.notEqual((await call("x".repeat(300000))).status, 200);
+    } finally { await server.close(); }
 });

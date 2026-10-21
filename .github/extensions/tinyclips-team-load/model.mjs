@@ -83,6 +83,53 @@ export function validateItemRef(input, { title = false, login = false, additiona
     return { ...input, ...normalized };
 }
 
+export const MAX_SESSION_BATCH = 10;
+// A bulk "start sessions" request: 1..MAX_SESSION_BATCH distinct issue refs, each { repository, number, title? }.
+export function validateSessionBatch(input) {
+    const fail = message => { throw new TeamLoadError("invalid_input", message); };
+    if (!input || typeof input !== "object" || Array.isArray(input)) fail("Provide items.");
+    const extra = Object.keys(input).filter(key => key !== "items");
+    if (extra.length) fail(`Unknown field: ${extra[0]}.`);
+    if (!Array.isArray(input.items) || !input.items.length) fail("Select at least one issue.");
+    if (input.items.length > MAX_SESSION_BATCH) fail(`Start at most ${MAX_SESSION_BATCH} sessions at once.`);
+    const seen = new Set();
+    return input.items.map(item => validateItemRef(item, { title: true })).filter(item => {
+        const key = `${item.repository.toLowerCase()}#${item.number}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+export const MAX_COMMENT_LENGTH = 65536;
+// Detail-view edits: an item ref plus exactly the fields that edit needs.
+export function validateEdit(input, kind) {
+    const fail = message => { throw new TeamLoadError("invalid_input", message); };
+    const fields = { comment: ["body"], delete_comment: ["commentId"], label: ["label", "add"], set_item_state: ["state"] }[kind];
+    if (!fields) fail("Unknown edit.");
+    if (!input || typeof input !== "object" || Array.isArray(input)) fail("Provide an item.");
+    const { repository, number, ...rest } = input;
+    const extra = Object.keys(rest).filter(key => !fields.includes(key));
+    if (extra.length) fail(`Unknown field: ${extra[0]}.`);
+    const ref = validateItemRef({ repository, number });
+    if (kind === "comment") {
+        if (typeof input.body !== "string" || !input.body.trim()) fail("Write a comment first.");
+        if (input.body.length > MAX_COMMENT_LENGTH) fail(`Comments are limited to ${MAX_COMMENT_LENGTH} characters.`);
+        return { ...ref, body: input.body };
+    }
+    if (kind === "delete_comment") {
+        if (!Number.isSafeInteger(input.commentId) || input.commentId < 1) fail("commentId must be a positive integer.");
+        return { ...ref, commentId: input.commentId };
+    }
+    if (kind === "label") {
+        if (typeof input.label !== "string" || !input.label.trim() || input.label.length > 100) fail("label must be a label name.");
+        if (typeof input.add !== "boolean") fail("add must be true or false.");
+        return { ...ref, label: input.label.trim(), add: input.add };
+    }
+    if (!["open", "closed"].includes(input.state)) fail('state must be "open" or "closed".');
+    return { ...ref, state: input.state };
+}
+
 export const MOMENTUM_DAYS = Object.freeze([7, 30, 90]);
 export const MOMENTUM_DEFAULT_DAYS = 7;
 export const MOMENTUM_METRICS = Object.freeze([

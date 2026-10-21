@@ -24,8 +24,14 @@ export async function perform(context, name, input = {}) {
         case "unassign": return hub.unassign(input);
         case "reassign": return hub.reassign(input);
         case "start_session": return hub.startSession(input);
+        case "start_sessions": return hub.startSessions(input);
         case "get_item": return hub.detail(input);
         case "get_momentum": return hub.momentum(input);
+        case "comment": return hub.comment(input);
+        case "delete_comment": return hub.deleteComment(input);
+        case "get_labels": return hub.repoLabels(input);
+        case "label": return hub.editLabel(input);
+        case "set_item_state": return hub.setItemState(input);
         default: throw new TeamLoadError("invalid_input", "Unknown Team Load action.");
     }
 }
@@ -86,7 +92,8 @@ export async function startServer(getContext, log = () => {}) {
                 const chunks = [];
                 for await (const chunk of request) {
                     size += chunk.length;
-                    if (size > 16384) throw new TeamLoadError("invalid_input", "The request body exceeds 16 KiB.");
+                    // Room for a maximum-length comment in any script.
+                    if (size > 262144) throw new TeamLoadError("invalid_input", "The request body exceeds 256 KiB.");
                     chunks.push(chunk);
                 }
                 let body;
