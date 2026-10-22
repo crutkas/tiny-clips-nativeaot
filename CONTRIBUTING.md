@@ -77,6 +77,11 @@ menu bar or Windows system tray, not as a main window. Platform prerequisites an
 capture permissions still apply; see [Windows build and run](windows/README.md#build--run)
 for Windows setup.
 
+Before using **Run macOS**, finish any recording, save your work, and quit any
+running direct-distribution TinyClips copy, including an installed copy. The button
+checks before building and again before launching and reports an error if one is
+running; it never force-quits the app or silently reuses an older process.
+
 ### Platform-aware CI
 
 Pull requests and pushes to `main` or `develop` always run lightweight change

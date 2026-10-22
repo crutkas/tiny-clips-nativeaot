@@ -1,10 +1,6 @@
 scripts:
   - name: Run macOS
-    command: >-
-      xcodebuild build -project mac/TinyClips.xcodeproj -scheme TinyClips
-      -configuration Debug -derivedDataPath .build/copilot-macos
-      CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual
-      && open .build/copilot-macos/Build/Products/Debug/TinyClips.app
+    command: sh scripts/run-macos.sh
   - name: Run Windows (x64)
     command: dotnet run --project windows\src\TinyClips.App\TinyClips.App.csproj -c Debug -p:Platform=x64
   - name: Run Windows (ARM64)
