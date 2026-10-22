@@ -6,12 +6,13 @@ Use the sun/moon button beside Refresh to switch between light and dark themes. 
 
 ## What it shows
 
-- **Who's on what**: one row per tracked person. The row shows a load meter (open assigned issues + authored PRs + review requests, with a limit marker), a status label (Free / Has room / Busy / At limit / N over limit), and their most recent item. Expand a row to see every item. The arrow icon beside a name opens that person's profile.
+- **Who's on what**: one row per tracked person. The row shows a load meter (open assigned issues + authored PRs + review requests, with a limit marker), a status label (Free / Has room / Busy / At limit / N over limit), and their most recent item. Expand a row to see every item, with up to two label pills (+N for the rest; hidden on narrow panels). The arrow icon beside a name opens that person's profile.
 - **Move an issue**: expand a person on the home screen, then drag an issue onto another teammate's row (including Copilot). This removes only the source person's assignment, keeps any other assignees, and offers Undo. PRs and reviews cannot be dragged. For a keyboard move, focus an issue and press Space, Tab to the target person's name button, and press Enter; Escape cancels.
 - **Needs an owner**: open, unassigned issues in the tracked repos, each with one-click assign to a person or to Copilot.
+- **Bulk local sessions**: tick issues in Needs an owner (or in an expanded person's list; the checkbox appears over the issue icon on hover), or use the select-all box, then **Start N Copilot sessions**. Up to 10 at a time. This does not assign the Copilot coding agent on GitHub; it assigns you and asks the hosting conversation to start one local Copilot coding session per issue. Those rows swap their issue icon for an animated Copilot icon ("Copilot session starting") for a few minutes. Escape clears the selection.
 - **Momentum**: daily commits, PRs opened and merged, and issues opened and completed across the tracked repos, drawn in the load-meter palette. It shows 7 days by default (or 30 / 90), for the whole team, one person or everyone, across all repos or just one. Hover a day for its numbers; the play button replays the animation. Days are UTC.
 - **Person profile** (`#person/<login>`): that person's Momentum over time, plus everything currently assigned to them and an Open on GitHub link. Copilot has a profile too. Contributions cover the tracked repos only, not their GitHub-wide activity.
-- Clicking any issue or PR opens it inside the canvas. You get the title, state, labels, assignees, the rendered body and the latest comments, plus Back and Open on GitHub. On an issue you can add or remove assignees (a tracked person or Copilot) even when it already has an owner.
+- Clicking any issue or PR opens it inside the canvas. You get the title, state, labels, assignees, the rendered body and the latest comments, plus Back and Open on GitHub. In tracked repos the view is editable: add or remove assignees (Copilot only on issues), toggle labels from the gear menu, post a Markdown comment (Cmd/Ctrl+Enter), delete your own comments, and close or reopen the issue or PR ("Close with comment" when there's a draft). Drafts survive refreshes and navigation until the page reloads.
 
 ## Actions (real GitHub writes)
 
@@ -23,6 +24,12 @@ Use the sun/moon button beside Refresh to switch between light and dark themes. 
 | Remove an assignee | `gh issue edit N --repo o/r --remove-assignee <login>`, re-read to verify |
 | Move to another person | `reassign` with `repository`, `number`, `from` and target `login`; adds and verifies the new owner before removing the source, without replacing the full assignee list |
 | Start a session myself | assigns you, then `session.send({ prompt })` to the hosting conversation; rolls back the assignment if sending fails. It only rolls back an assignment it made itself. |
+| Start sessions (bulk) | `start_sessions` with `items[]`: assigns you to each issue, then one `session.send({ prompt })` listing every issue (repo, number, title, URL) and asking for one local Copilot coding session each. If a claim or the send fails, it rolls back new assignments, including the current claim when its write response or verification read fails. Existing assignments are preserved; an unverified rollback reports which issue to check on GitHub. |
+| Comment | `gh api POST repos/o/r/issues/N/comments` (body over stdin); Undo deletes it |
+| Delete a comment | `gh api DELETE repos/o/r/issues/comments/ID`, only your own and only on the item shown |
+| Labels | `gh api POST/DELETE repos/o/r/issues/N/labels`; only labels that already exist in the repo, re-read to verify. The picker fetches all label pages (up to 1,000, with an explicit error above that limit); Undo targets the original issue even after navigation. |
+| Close / reopen | `gh issue\|pr close\|reopen N --repo o/r`, re-read to verify; merged PRs can't be reopened |
+| PR assignees | `gh api POST/DELETE repos/o/r/issues/N/assignees` (people only, not Copilot) |
 | Undo | reverses the last change: removes someone you just added, or puts back someone you just removed |
 
 Before writing, it checks for conflicts: the issue is closed or a PR. Without `additional`, an already-assigned issue is also a conflict, which keeps Needs an owner a safe triage action; adding to an assigned issue is an explicit choice made from the issue's Assignees list. After each write it refreshes.
@@ -57,4 +64,4 @@ The canvas is served from a loopback server with a per-launch nonce, a host/orig
 node --test .github/extensions/tinyclips-team-load/tests/team-load.test.mjs .github/extensions/tinyclips-team-load/tests/momentum.test.mjs
 ```
 
-Tests mock `gh`; they never touch GitHub. Momentum request-state tests use a minimal DOM fixture and deferred responses to cover selection changes, tracking races, and same-selection stale-data fallback without browser dependencies.
+Tests mock `gh`; they never touch GitHub. Client request-state tests use minimal DOM fixtures and deferred responses to cover bulk controls, navigation during edits, label Undo, Momentum selection changes, tracking races, and same-selection stale-data fallback without browser dependencies.

@@ -49,6 +49,7 @@ export function renderHtml(nonce, theme = null) {
     <div class="side-col">
       <section class="box triage-box" aria-labelledby="triage-h">
         <div class="box-head">
+          <input type="checkbox" class="sel sel-all" id="triage-all" aria-label="Select all unowned issues" hidden>
           <h2 id="triage-h">Needs an owner <span class="Counter" id="triage-count"></span></h2>
         </div>
         <ul class="tickets" id="tickets" aria-busy="true"></ul>
@@ -59,6 +60,7 @@ export function renderHtml(nonce, theme = null) {
 </div>
 <div class="app detail-view" id="detail" hidden></div>
 <div class="app detail-view person-view" id="person" hidden></div>
+<div class="bulkbar" id="bulkbar" role="region" aria-label="Selected issues" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>`;
