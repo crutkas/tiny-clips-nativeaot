@@ -102,6 +102,12 @@ windows/
 
 WinUI 3 requires an explicit platform (`x64` or `ARM64`; `AnyCPU` is not supported).
 
+In the GitHub Copilot app, accept `.github/github-app.yml` and select **Run Windows (x64)**
+or **Run Windows (ARM64)** for your machine. These manual buttons build and launch the
+current session's app with package identity; Developer Mode and the prerequisites above
+still apply. See [Copilot run buttons](../CONTRIBUTING.md#run-buttons-in-the-github-copilot-app)
+for the macOS option.
+
 ```powershell
 # Restore
 dotnet restore windows/TinyClips.Windows.slnx

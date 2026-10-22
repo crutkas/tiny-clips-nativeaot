@@ -5,6 +5,9 @@ own `CHANGELOG.md` at the repository root.
 
 ## [Unreleased]
 
+### Fixed
+- Windows CI no longer builds for README/changelog-only or unrelated configuration changes, and skips whole Windows jobs when no build inputs changed.
+
 ### Changed
 - Added an opt-in local-NVMe ReFS Dev Drive pilot to ARM64 build-mode Windows Launch Smoke
   jobs, moving the workspace, temporary files, and NuGet caches before checkout. Other builds
@@ -18,6 +21,7 @@ own `CHANGELOG.md` at the repository root.
   prerequisites are resolved explicitly instead of silently skipping symbol generation.
 
 ### Added
+- Added manual GitHub Copilot app run buttons for Windows x64 and ARM64, using `dotnet run` to build and launch with package identity.
 - **What's New introduces Studio.** A new illustrated screen-and-camera composition and editing highlights explain the early preview, with a switch to enable it right there. It appears once per content revision for existing users, not on every app update; new installs keep the onboarding tour. The switch is saved, and ordinary video recording stays unchanged.
 - **Tiny Clips Studio (early preview, off by default).** Studio records the screen and the camera
   as separate layers and opens an editor when the recording ends. Pick a background and padding,

@@ -1,0 +1,9 @@
+scripts:
+  - name: Run macOS
+    command: sh scripts/run-macos.sh
+  - name: Run Windows (x64)
+    command: dotnet run --project windows\src\TinyClips.App\TinyClips.App.csproj -c Debug -p:Platform=x64
+  - name: Run Windows (ARM64)
+    command: dotnet run --project windows\src\TinyClips.App\TinyClips.App.csproj -c Debug -p:Platform=ARM64
+
+auto_open_in_browser: false

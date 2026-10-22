@@ -28,11 +28,13 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v4
         with:
+          predicate-quantifier: some-with-excludes
           filters: |
             mac:
               - 'mac/**'
-              - 'shared/studio/**'
+              - 'shared/studio/fixtures/**'
               - '.github/workflows/build.yml'
+              - '!**/*.md'
           base: ${{ github.ref }}
 
   build:

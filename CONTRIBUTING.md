@@ -58,6 +58,47 @@ See [docs/sparkle-setup.md](docs/sparkle-setup.md) for full details.
 
 Press **⌘R** to build and run the selected scheme.
 
+### Run buttons in the GitHub Copilot app
+
+Review and accept the repository configuration in `.github/github-app.yml` when the
+GitHub Copilot app prompts you. Its manual scripts provide these run buttons:
+
+| Button | Host | Behavior |
+|--------|------|----------|
+| Run macOS | macOS with Xcode | Builds the direct-distribution Debug app with ad-hoc signing, then opens it. |
+| Run Windows (x64) | Windows x64 | Builds and launches the Debug app with package identity. |
+| Run Windows (ARM64) | Windows ARM64 | Builds and launches the Debug app with package identity. |
+
+Choose the button matching your host; these commands do not run the other OS's app
+remotely. They run against the current session's checkout and do not run automatically
+when a session is created. The macOS build output stays in the ignored
+`.build/copilot-macos/` directory inside that checkout. TinyClips appears in the macOS
+menu bar or Windows system tray, not as a main window. Platform prerequisites and
+capture permissions still apply; see [Windows build and run](windows/README.md#build--run)
+for Windows setup.
+
+Before using **Run macOS**, finish any recording, save your work, and quit any
+running direct-distribution TinyClips copy, including an installed copy. The button
+checks before building and again before launching and reports an error if one is
+running; it never force-quits the app or silently reuses an older process.
+
+### Platform-aware CI
+
+Pull requests and pushes to `main` or `develop` always run lightweight change
+detection so checks can report a successful skip without leaving required checks
+pending. Platform build/test jobs only allocate macOS or Windows runners when their
+inputs change:
+
+- macOS: files under `mac/`, shared Studio fixtures, or `.github/workflows/build.yml`.
+- Windows: files under `windows/src/` or `windows/tests/`, top-level Windows MSBuild
+  properties/targets and solutions, the direct-package validation script, shared
+  Studio fixtures, or `.github/workflows/windows-build.yml`.
+
+Markdown-only changes do not trigger either platform's builds. Documentation,
+Copilot app configuration, extensions, and standalone tooling outside those inputs
+also skip platform builds. Manually dispatching **Windows Build** still forces its
+builds and tests. Release/tag and other manually triggered workflows are unchanged.
+
 ### Building without code signing (CI / headless)
 
 ```bash
