@@ -11,8 +11,13 @@ on:
         required: false
         type: string
       publish:
-        description: 'Publish the package after the protected-environment approval'
+        description: 'Submit to Internal Testing, then production after separate protected-environment approvals'
         required: true
+        default: false
+        type: boolean
+      replace_flight_draft:
+        description: 'Publish only: discard an unsubmitted portal-created Internal Testing draft (keeps the flight and testers)'
+        required: false
         default: false
         type: boolean
       diagnose_only:
@@ -54,10 +59,15 @@ jobs:
     name: Package Microsoft Store upload
     if: github.event_name == 'push' || !inputs.diagnose_only
     runs-on: windows-latest
+    outputs:
+      source_commit: ${{ steps.version.outputs.source_commit }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
@@ -65,6 +75,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Set release version
+        id: version
         shell: pwsh
         run: |
           $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
@@ -76,6 +87,12 @@ jobs:
           if ($tag -notmatch '^v(?<base>\d+\.\d+\.\d+)(?:\.(?<revision>\d+))?-windows$') {
             throw "Windows release tags must look like v1.2.3-windows or v1.2.3.4-windows. Got '$tag'."
           }
+
+          $tagCommit = git rev-parse --verify "refs/tags/$tag^{commit}"
+          if ($LASTEXITCODE -ne 0) { throw "The requested release tag does not exist." }
+          $head = git rev-parse HEAD
+          if ($head -ne $tagCommit) { throw "Checkout does not match the requested release tag." }
+          "source_commit=$head" >> $env:GITHUB_OUTPUT
 
           $revision = if ($Matches.revision) { $Matches.revision } else { "0" }
           "PACKAGE_VERSION=$($Matches.base).$revision" >> $env:GITHUB_ENV
@@ -145,16 +162,22 @@ jobs:
           path: artifacts/store/TinyClips-*.msixupload
           if-no-files-found: error
 
-  publish:
-    name: Submit to Microsoft Store
+  flight:
+    name: Approve and submit to Internal Testing
     needs: package
     if: github.event_name == 'push' || inputs.publish
     runs-on: windows-latest
     environment: microsoft-store
+    outputs:
+      flight_id: ${{ steps.flight.outputs.flight_id }}
+      upload_sha256: ${{ steps.upload.outputs.upload_sha256 }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.package.outputs.source_commit }}
+          persist-credentials: false
 
       - name: Download Store package
         uses: actions/download-artifact@v8
@@ -203,6 +226,162 @@ jobs:
           client-id: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
           client-secret: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
+      - name: Prepare Internal Testing flight
+        id: flight
+        shell: pwsh
+        env:
+          STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
+          FLIGHT_GROUP_IDS: ${{ vars.MICROSOFT_STORE_FLIGHT_GROUP_IDS }}
+          REPLACE_FLIGHT_DRAFT: ${{ github.event_name == 'workflow_dispatch' && inputs.replace_flight_draft }}
+          PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+          PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+          PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+        run: |
+          $requiredValues = @{
+            "MICROSOFT_STORE_PRODUCT_ID repository variable" = $env:STORE_PRODUCT_ID
+            "PARTNER_CENTER_TENANT_ID environment secret" = $env:PARTNER_CENTER_TENANT_ID
+            "PARTNER_CENTER_CLIENT_ID environment secret" = $env:PARTNER_CENTER_CLIENT_ID
+            "PARTNER_CENTER_CLIENT_SECRET environment secret" = $env:PARTNER_CENTER_CLIENT_SECRET
+          }
+          $missing = $requiredValues.GetEnumerator() |
+            Where-Object { [string]::IsNullOrWhiteSpace($_.Value) } |
+            ForEach-Object Key
+          if ($missing) {
+            throw "Configure the following before Internal Testing submission: $($missing -join ', ')."
+          }
+
+          if ($env:PARTNER_CENTER_TENANT_ID -notmatch '^[0-9a-fA-F-]{36}$' -or
+              $env:PARTNER_CENTER_CLIENT_ID -notmatch '^[0-9a-fA-F-]{36}$' -or
+              $env:STORE_PRODUCT_ID -notmatch '^[a-zA-Z0-9]+$') {
+            throw "The Partner Center tenant, client, or product ID has an invalid format."
+          }
+
+          try {
+            $token = Invoke-RestMethod -Method Post `
+              -Uri "https://login.microsoftonline.com/$env:PARTNER_CENTER_TENANT_ID/oauth2/token" `
+              -ContentType "application/x-www-form-urlencoded" `
+              -Body @{
+                grant_type = "client_credentials"
+                client_id = $env:PARTNER_CENTER_CLIENT_ID
+                client_secret = $env:PARTNER_CENTER_CLIENT_SECRET
+                resource = "https://manage.devcenter.microsoft.com"
+              }
+          }
+          catch {
+            throw "Microsoft Entra authentication failed. Check the Partner Center tenant, client ID, and secret; credentials and token responses were not logged."
+          }
+          if (-not $token.access_token) { throw "Microsoft Entra returned no access token." }
+
+          $applicationUri = "https://manage.devcenter.microsoft.com/v1.0/my/applications/$env:STORE_PRODUCT_ID"
+          $headers = @{ Authorization = "Bearer $($token.access_token)" }
+          try {
+            try {
+              Invoke-RestMethod -Method Get -Uri $applicationUri -Headers $headers | Out-Null
+            }
+            catch {
+              throw "Partner Center could not read this application. Check the Store product ID and the Entra application's Partner Center association."
+            }
+
+            $matchingFlights = @()
+            $skip = 0
+            do {
+              try {
+                $page = Invoke-RestMethod -Method Get `
+                  -Uri "$applicationUri/listflights?top=100&skip=$skip" `
+                  -Headers $headers
+              }
+              catch {
+                throw "Partner Center could not list package flights. No submission was changed."
+              }
+              if ($null -eq $page.value) { throw "Partner Center returned no package-flight list." }
+              $matchingFlights += @($page.value | Where-Object { $_.friendlyName -ceq "Internal Testing" })
+              $count = @($page.value).Count
+              if ($page.'@nextLink' -and $count -eq 0) {
+                throw "Partner Center returned an empty flight page with a continuation."
+              }
+              $skip += $count
+            } while ($page.'@nextLink')
+
+            if ($matchingFlights.Count -eq 0) {
+              $groupIds = @($env:FLIGHT_GROUP_IDS -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -Unique)
+              if ($groupIds.Count -eq 0 -or @($groupIds | Where-Object { $_ -notmatch '^[a-zA-Z0-9][a-zA-Z0-9-]*$' }).Count) {
+                throw "Internal Testing does not exist. Set MICROSOFT_STORE_FLIGHT_GROUP_IDS to comma-separated Partner Center tester group IDs before publishing."
+              }
+              try {
+                $created = Invoke-RestMethod -Method Post `
+                  -Uri "$applicationUri/flights" `
+                  -Headers $headers `
+                  -ContentType "application/json" `
+                  -Body (@{ friendlyName = "Internal Testing"; groupIds = $groupIds } | ConvertTo-Json -Depth 5 -Compress)
+              }
+              catch {
+                throw "Partner Center could not create Internal Testing. Inspect the flight list before retrying; the request may have reached the service."
+              }
+              if ($created.friendlyName -cne "Internal Testing") {
+                throw "Partner Center returned an unexpected flight after creation. Inspect flights before retrying."
+              }
+              $matchingFlights = @($created)
+              Write-Host "Created Internal Testing using MICROSOFT_STORE_FLIGHT_GROUP_IDS."
+            }
+
+            if ($matchingFlights.Count -ne 1) {
+              throw "Expected exactly one package flight named 'Internal Testing'; found $($matchingFlights.Count). No submission was changed."
+            }
+            $flightId = [string]$matchingFlights[0].flightId
+            if ($flightId -notmatch '^[a-zA-Z0-9][a-zA-Z0-9-]*$') {
+              throw "Partner Center returned an invalid package-flight ID."
+            }
+
+            $flightUri = "$applicationUri/flights/$flightId"
+            try {
+              $flight = Invoke-RestMethod -Method Get -Uri $flightUri -Headers $headers
+            }
+            catch {
+              throw "Partner Center could not read Internal Testing."
+            }
+            if ($flight.flightId -cne $flightId -or $flight.friendlyName -cne "Internal Testing") {
+              throw "Partner Center returned an unexpected package flight."
+            }
+
+            if ($flight.pendingFlightSubmission) {
+              $submissionId = [string]$flight.pendingFlightSubmission.id
+              if ($submissionId -notmatch '^[a-zA-Z0-9][a-zA-Z0-9-]*$') {
+                throw "Partner Center returned an invalid pending flight submission ID."
+              }
+              $submissionUri = "$flightUri/submissions/$submissionId"
+              try {
+                $submission = Invoke-RestMethod -Method Get -Uri $submissionUri -Headers $headers
+              }
+              catch {
+                throw "Partner Center could not read the pending Internal Testing submission."
+              }
+              if ($submission.id -cne $submissionId -or $submission.flightId -cne $flightId) {
+                throw "Partner Center returned an unexpected flight submission."
+              }
+              if ($submission.status -notin @("PendingCommit", "CommitFailed")) {
+                throw "Internal Testing has a submission that is not an editable draft. Resolve it in Partner Center before publishing; no draft was removed."
+              }
+              if ([string]::IsNullOrWhiteSpace($submission.fileUploadUrl)) {
+                if ($env:REPLACE_FLIGHT_DRAFT -ne "true" -or $submission.status -ne "PendingCommit") {
+                  throw "Internal Testing has a portal-created draft without an API upload URL. To replace only that unsubmitted draft, rerun manual publish with replace_flight_draft enabled. The flight and tester groups are preserved."
+                }
+                try {
+                  Invoke-RestMethod -Method Delete -Uri $submissionUri -Headers $headers | Out-Null
+                }
+                catch {
+                  throw "Partner Center could not delete the approved Internal Testing draft. Inspect its state before retrying; the flight and production listing were not targeted."
+                }
+                Write-Host "Discarded only the explicitly approved portal-created PendingCommit draft."
+              }
+            }
+
+            "flight_id=$flightId" >> $env:GITHUB_OUTPUT
+          }
+          finally {
+            $token = $null
+            $headers = $null
+          }
+
       - name: Setup Microsoft Store Developer CLI
         uses: microsoft/microsoft-store-apppublisher@v1.4
 
@@ -214,18 +393,117 @@ jobs:
             --sellerId "${{ secrets.PARTNER_CENTER_SELLER_ID }}" `
             --clientId "${{ secrets.PARTNER_CENTER_CLIENT_ID }}" `
             --clientSecret "${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}"
+          if ($LASTEXITCODE -ne 0) { throw "Microsoft Store CLI configuration failed." }
 
-      - name: Publish Store package
+      - name: Submit package to Internal Testing only
+        id: upload
+        shell: pwsh
+        env:
+          STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
+          FLIGHT_ID: ${{ steps.flight.outputs.flight_id }}
+        run: |
+          $uploads = @(Get-ChildItem artifacts/store -File -Filter *.msixupload)
+          if ($uploads.Count -ne 1) { throw "Expected exactly one Store upload artifact." }
+          if ([string]::IsNullOrWhiteSpace($env:FLIGHT_ID)) { throw "Internal Testing flight ID was not resolved; refusing to submit." }
+
+          msstore publish $uploads[0].FullName --appId $env:STORE_PRODUCT_ID --flightId $env:FLIGHT_ID
+          if ($LASTEXITCODE -ne 0) { throw "Internal Testing submission failed. Production is blocked." }
+
+          $uploadHash = (Get-FileHash -LiteralPath $uploads[0].FullName -Algorithm SHA256).Hash
+          "upload_sha256=$uploadHash" >> $env:GITHUB_OUTPUT
+          @(
+            "## Internal Testing flight submitted"
+            "- Flight ID: $env:FLIGHT_ID"
+            "- Upload SHA256: $uploadHash"
+            ""
+            "Before approving production, confirm the flight is published in Partner Center, install it as a tester, and complete release checks. Submission success is not certification or Store availability."
+          ) >> $env:GITHUB_STEP_SUMMARY
+
+  publish:
+    name: Approve and submit tested upload to production
+    needs: [package, flight]
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: windows-latest
+    environment: microsoft-store
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.package.outputs.source_commit }}
+          persist-credentials: false
+
+      - name: Download Store package
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-store-package
+          path: artifacts/store
+
+      - name: Validate the exact upload submitted to Internal Testing
+        shell: pwsh
+        env:
+          FLIGHT_UPLOAD_SHA256: ${{ needs.flight.outputs.upload_sha256 }}
+        run: |
+          $uploads = @(Get-ChildItem artifacts/store -File -Filter *.msixupload)
+          if ($uploads.Count -ne 1) { throw "Expected exactly one Store upload artifact." }
+          .\windows\packaging\Assert-StoreUpload.ps1 -UploadPath $uploads[0].FullName
+          if ([string]::IsNullOrWhiteSpace($env:FLIGHT_UPLOAD_SHA256) -or
+              (Get-FileHash -LiteralPath $uploads[0].FullName -Algorithm SHA256).Hash -ne $env:FLIGHT_UPLOAD_SHA256) {
+            throw "Production upload does not match the artifact submitted to Internal Testing."
+          }
+
+      - name: Validate publishing configuration
+        shell: pwsh
+        env:
+          STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
+          PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+          PARTNER_CENTER_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+          PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+          PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+        run: |
+          $requiredValues = @{
+            "MICROSOFT_STORE_PRODUCT_ID repository variable" = $env:STORE_PRODUCT_ID
+            "PARTNER_CENTER_TENANT_ID environment secret" = $env:PARTNER_CENTER_TENANT_ID
+            "PARTNER_CENTER_SELLER_ID environment secret" = $env:PARTNER_CENTER_SELLER_ID
+            "PARTNER_CENTER_CLIENT_ID environment secret" = $env:PARTNER_CENTER_CLIENT_ID
+            "PARTNER_CENTER_CLIENT_SECRET environment secret" = $env:PARTNER_CENTER_CLIENT_SECRET
+          }
+          $missing = $requiredValues.GetEnumerator() |
+            Where-Object { [string]::IsNullOrWhiteSpace($_.Value) } |
+            ForEach-Object Key
+          if ($missing) {
+            throw "Configure the following before Store publication: $($missing -join ', ')."
+          }
+
+      - name: Diagnose Partner Center credentials
+        uses: ./.github/actions/diagnose-partner-center
+        with:
+          tenant-id: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+          seller-id: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+          client-id: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+          client-secret: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+
+      - name: Setup Microsoft Store Developer CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.4
+
+      - name: Configure Microsoft Store Developer CLI
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId "${{ secrets.PARTNER_CENTER_TENANT_ID }}" `
+            --sellerId "${{ secrets.PARTNER_CENTER_SELLER_ID }}" `
+            --clientId "${{ secrets.PARTNER_CENTER_CLIENT_ID }}" `
+            --clientSecret "${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}"
+          if ($LASTEXITCODE -ne 0) { throw "Microsoft Store CLI configuration failed." }
+
+      - name: Submit approved package to the main Store listing
         shell: pwsh
         env:
           STORE_PRODUCT_ID: ${{ vars.MICROSOFT_STORE_PRODUCT_ID }}
         run: |
-          $upload = Get-ChildItem artifacts/store -Filter *.msixupload | Select-Object -First 1
-          if (-not $upload) {
-            throw "The downloaded Store package is missing."
-          }
+          $uploads = @(Get-ChildItem artifacts/store -File -Filter *.msixupload)
+          if ($uploads.Count -ne 1) { throw "Expected exactly one Store upload artifact." }
 
-          # Pass the package file itself. Pointing msstore at a directory makes it look for a
-          # project to infer a publisher from, which does not exist in this workflow.
-          msstore publish $upload.FullName --appId $env:STORE_PRODUCT_ID
-          if ($LASTEXITCODE -ne 0) { throw "msstore publish failed." }
+          # Pass the package file itself; a directory makes msstore look for a project.
+          msstore publish $uploads[0].FullName --appId $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { throw "Microsoft Store production submission failed." }
