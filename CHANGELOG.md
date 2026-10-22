@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed
+- App CI now ignores documentation-only and unrelated Copilot configuration changes while retaining platform source, test, shared fixture, and build-workflow coverage. Windows build/test jobs skip before allocating Windows runners.
 - Team Load now keeps bulk session controls in sync when every issue has an owner, rolls back partially verified session claims, and loads repository labels beyond the first page. Label Undo and closing with a comment now work reliably across detail-view navigation.
 - Team Load Momentum now invalidates in-flight history when tracking changes and clears previous totals when switching selections. Failed loads only fall back to earlier data for the same selection.
 

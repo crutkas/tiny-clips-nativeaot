@@ -5,6 +5,9 @@ own `CHANGELOG.md` at the repository root.
 
 ## [Unreleased]
 
+### Fixed
+- Windows CI no longer builds for README/changelog-only or unrelated configuration changes, and skips whole Windows jobs when no build inputs changed.
+
 ### Changed
 - Added an opt-in local-NVMe ReFS Dev Drive pilot to ARM64 build-mode Windows Launch Smoke
   jobs, moving the workspace, temporary files, and NuGet caches before checkout. Other builds

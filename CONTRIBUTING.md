@@ -77,6 +77,23 @@ menu bar or Windows system tray, not as a main window. Platform prerequisites an
 capture permissions still apply; see [Windows build and run](windows/README.md#build--run)
 for Windows setup.
 
+### Platform-aware CI
+
+Pull requests and pushes to `main` or `develop` always run lightweight change
+detection so checks can report a successful skip without leaving required checks
+pending. Platform build/test jobs only allocate macOS or Windows runners when their
+inputs change:
+
+- macOS: files under `mac/`, shared Studio fixtures, or `.github/workflows/build.yml`.
+- Windows: files under `windows/src/` or `windows/tests/`, top-level Windows MSBuild
+  properties/targets and solutions, the direct-package validation script, shared
+  Studio fixtures, or `.github/workflows/windows-build.yml`.
+
+Markdown-only changes do not trigger either platform's builds. Documentation,
+Copilot app configuration, extensions, and standalone tooling outside those inputs
+also skip platform builds. Manually dispatching **Windows Build** still forces its
+builds and tests. Release/tag and other manually triggered workflows are unchanged.
+
 ### Building without code signing (CI / headless)
 
 ```bash

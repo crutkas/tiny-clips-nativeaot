@@ -26,16 +26,25 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v4
         with:
+          predicate-quantifier: some-with-excludes
           filters: |
             windows:
-              - 'windows/**'
-              - 'shared/studio/**'
+              - 'windows/src/**'
+              - 'windows/tests/**'
+              - 'windows/*.props'
+              - 'windows/*.targets'
+              - 'windows/*.sln'
+              - 'windows/*.slnx'
+              - 'windows/packaging/Assert-DirectPackage.ps1'
+              - 'shared/studio/fixtures/**'
               - '.github/workflows/windows-build.yml'
+              - '!**/*.md'
           base: ${{ github.ref }}
 
   build:
     name: Build (Windows, ${{ matrix.platform }})
     needs: changes
+    if: ${{ needs.changes.outputs.windows == 'true' }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -49,22 +58,15 @@ jobs:
             architecture: arm64
 
     steps:
-      - name: Report successful skip
-        if: ${{ needs.changes.outputs.windows != 'true' }}
-        run: echo "No Windows files changed; skipping the Windows build."
-
       - name: Checkout code
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
       - name: Restore direct app for ${{ matrix.platform }}
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         run: >-
           dotnet restore windows/src/TinyClips.App/TinyClips.App.csproj
           -p:Configuration=Release
@@ -73,7 +75,6 @@ jobs:
           -p:TinyClipsDirectReleaseBuild=true
 
       - name: Build and inspect direct package for ${{ matrix.platform }}
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         shell: pwsh
         run: |
           $packageDirectory = Join-Path (Resolve-Path ".") "artifacts/direct-${{ matrix.architecture }}/"
@@ -107,25 +108,19 @@ jobs:
   store-build:
     name: Build Microsoft Store flavor
     needs: changes
+    if: ${{ needs.changes.outputs.windows == 'true' }}
     runs-on: windows-latest
 
     steps:
-      - name: Report successful skip
-        if: ${{ needs.changes.outputs.windows != 'true' }}
-        run: echo "No Windows files changed; skipping the Store flavor build."
-
       - name: Checkout code
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
       - name: Build framework-dependent Store flavor
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         run: >-
           dotnet build windows/src/TinyClips.App/TinyClips.App.csproj
           -c Release
@@ -142,48 +137,35 @@ jobs:
     name: Run Core Tests
     runs-on: windows-latest
     needs: [changes, build, store-build]
+    if: ${{ needs.changes.outputs.windows == 'true' }}
 
     steps:
-      - name: Report successful skip
-        if: ${{ needs.changes.outputs.windows != 'true' }}
-        run: echo "No Windows files changed; skipping the Windows core tests."
-
       - name: Checkout code
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
       - name: Restore test project
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         run: dotnet restore windows/tests/TinyClips.Core.Tests/TinyClips.Core.Tests.csproj
 
       - name: Run tests
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         run: dotnet test windows/tests/TinyClips.Core.Tests/TinyClips.Core.Tests.csproj -c Release --no-restore
 
       - name: Restore Settings view-model tests
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         run: dotnet restore windows/tests/TinyClips.App.Tests/TinyClips.App.Tests.csproj -p:Platform=x64
 
       - name: Run Settings view-model tests
-        if: ${{ needs.changes.outputs.windows == 'true' }}
         run: dotnet test windows/tests/TinyClips.App.Tests/TinyClips.App.Tests.csproj -c Release -p:Platform=x64 --no-restore
 
   no-windows-changes:
     name: Build skipped (no Windows changes)
     needs: changes
+    if: ${{ needs.changes.outputs.windows != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Report successful skip
-        if: ${{ needs.changes.outputs.windows != 'true' }}
         run: echo "No Windows files changed; skipping the Windows build and tests."
-
-      - name: Report Windows checks ran
-        if: ${{ needs.changes.outputs.windows == 'true' }}
-        run: echo "Windows files changed; the Windows build and tests ran."
