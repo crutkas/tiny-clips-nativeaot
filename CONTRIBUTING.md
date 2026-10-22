@@ -58,6 +58,25 @@ See [docs/sparkle-setup.md](docs/sparkle-setup.md) for full details.
 
 Press **⌘R** to build and run the selected scheme.
 
+### Run buttons in the GitHub Copilot app
+
+Review and accept the repository configuration in `.github/github-app.yml` when the
+GitHub Copilot app prompts you. Its manual scripts provide these run buttons:
+
+| Button | Host | Behavior |
+|--------|------|----------|
+| Run macOS | macOS with Xcode | Builds the direct-distribution Debug app with ad-hoc signing, then opens it. |
+| Run Windows (x64) | Windows x64 | Builds and launches the Debug app with package identity. |
+| Run Windows (ARM64) | Windows ARM64 | Builds and launches the Debug app with package identity. |
+
+Choose the button matching your host; these commands do not run the other OS's app
+remotely. They run against the current session's checkout and do not run automatically
+when a session is created. The macOS build output stays in the ignored
+`.build/copilot-macos/` directory inside that checkout. TinyClips appears in the macOS
+menu bar or Windows system tray, not as a main window. Platform prerequisites and
+capture permissions still apply; see [Windows build and run](windows/README.md#build--run)
+for Windows setup.
+
 ### Building without code signing (CI / headless)
 
 ```bash

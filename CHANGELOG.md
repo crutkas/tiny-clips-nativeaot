@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Team Load Momentum now invalidates in-flight history when tracking changes and clears previous totals when switching selections. Failed loads only fall back to earlier data for the same selection.
 
 ### Added
+- Added GitHub Copilot app run buttons for the macOS app and Windows x64/ARM64 apps, building and launching the current session's checkout on its matching host.
 - Team Load now lets you drag assigned issues between teammates on the home screen, including Copilot, with highlighted drop targets, keyboard movement, and Undo. Moves preserve other assignees and verify the new owner before removing the old one.
 - Team Load now has a light/dark theme toggle beside Refresh, updating the canvas and label colors without reloading.
 - Added the TinyClips Team Load Copilot canvas, showing what each teammate and the Copilot coding agent is working on across the app, website, and marketing repositories. It includes per-person load meters, a Needs an owner triage list, and issue detail with assignee editing: assign to a person or Copilot, and add or remove assignees (including Copilot) on issues that already have an owner, with Undo.
