@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 import {
     AGENT, TeamLoadError, canonLogin, cleanTitle, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign,
-    ago, parseItemUrl, normalizeTracking, validateItemRef, validateConfig, validateEdit, validateSessionBatch, MAX_SESSION_BATCH,
+    ago, shortRepo, parseItemUrl, loginPattern, repoPattern, planRowUpdate, normalizeTracking, validateItemRef, validateConfig, validateEdit, validateSessionBatch, MAX_SESSION_BATCH,
     MOMENTUM_DAYS, MOMENTUM_METRICS, dailyMomentum, momentumStart, validateMomentumInput, labelSummary } from "../model.mjs";
 import { readConfig, createTrackingStore } from "../state.mjs";
 import { createGitHub, normalizeIssue, normalizePull } from "../github.mjs";
@@ -908,7 +909,7 @@ function editServer({ isPr = false, merged = false, state = "open", labels = ["b
         "issues/5/assignees": () => ({}),
         "repos/o/r/issues/5": () => ({ state: item.state, pull_request: isPr ? { merged_at: merged ? iso(1) : null } : undefined, labels: item.labels.map(name => ({ name })), assignees: [] }),
         "api --hostname github.com user": () => ({ login: "BurkeHolland" }),
-        "labels(first": () => ({ data: { repository: { labels: { nodes: [{ name: "bug", color: "d73a4a", description: "Broken" }, { name: "good first issue", color: "7057ff", description: "" }] } } } }),
+        "labels(first": () => ({ data: { repository: { labels: page([{ name: "bug", color: "d73a4a", description: "Broken" }, { name: "good first issue", color: "7057ff", description: "" }]) } } }),
         " close 5": () => { item.state = "closed"; return ""; },
         " reopen 5": () => { item.state = "open"; return ""; },
     });
@@ -949,6 +950,47 @@ test("editLabel adds and removes known labels, is idempotent, and never creates 
     assert.ok(server.calls.some(args => args.at(-1) === "repos/o/r/issues/5/labels/good%20first%20issue"));
     await assert.rejects(gh.editLabel({ repository: "o/r", number: 5, label: "made-up", add: true }), error => error.code === "invalid_input");
     assert.equal(writes(), 2);
+});
+
+test("repository labels paginate before caching and allow labels beyond the first hundred", async () => {
+    const first = Array.from({ length: 100 }, (_, i) => ({ name: `label-${i}`, color: "d73a4a" }));
+    const last = { name: "z-last", color: "7057ff", description: "On page two" };
+    const applied = [];
+    const { run, calls } = fakeGh({
+        "labels(first": ({ vars }) => ({ data: { repository: { labels: vars.after ? page([last]) : page(first, "next-labels") } } }),
+        "issues/5/labels": ({ options }) => { applied.push(...JSON.parse(options.input).labels); return []; },
+        "repos/o/r/issues/5": () => ({ state: "open", labels: applied.map(name => ({ name })) }),
+    });
+    const gh = createGitHub({ run });
+    const labels = await gh.repoLabels("o/r");
+    assert.equal(labels.length, 101);
+    assert.equal(labels.at(-1).description, "On page two");
+    assert.equal(await gh.repoLabels("O/R"), labels, "cache the complete list case-insensitively");
+    assert.deepEqual((await gh.editLabel({ repository: "o/r", number: 5, label: "Z-LAST", add: true })).labels, [{ name: "z-last", color: "7057ff" }]);
+    assert.equal(calls.filter(args => args.some(arg => arg.startsWith("query="))).length, 2);
+    assert.ok(calls.some(args => args.includes("after=next-labels")));
+});
+
+test("a failed label page is not cached as a complete list", async () => {
+    let fail = true;
+    const { run, calls } = fakeGh({
+        "labels(first": ({ vars }) => {
+            if (vars.after && fail) throw new TeamLoadError("permission_denied", "Labels unavailable");
+            return { data: { repository: { labels: vars.after ? page([{ name: "last", color: "7057ff" }]) : page([], "next") } } };
+        },
+    });
+    const gh = createGitHub({ run });
+    await assert.rejects(gh.repoLabels("o/r"), /Labels unavailable/);
+    fail = false;
+    assert.equal((await gh.repoLabels("o/r"))[0].name, "last");
+    assert.equal(calls.length, 4);
+});
+
+test("repository label coverage limits fail explicitly rather than caching a partial list", async () => {
+    const { run } = fakeGh({
+        "labels(first": () => ({ data: { repository: { labels: page([], "more") } } }),
+    });
+    await assert.rejects(createGitHub({ run }).repoLabels("o/r"), error => error.code === "coverage_limit" && /labels/.test(error.message));
 });
 
 test("setState closes and reopens issues and PRs, and refuses merged PRs", async () => {
@@ -1069,6 +1111,57 @@ test("start_sessions is all or nothing when a claim fails, and rejects untracked
     assert.equal(f.writes.length, 2, "nothing claimed when a repo is untracked");
 });
 
+for (const failure of ["verification", "write response"]) {
+    test(`start_sessions compensates for a failed ${failure} after a claim reaches GitHub`, async () => {
+        const prompts = [];
+        const f = hubFixture({ sendPrompt: async prompt => prompts.push(prompt), issues: { "o/r": [issueNode(5), issueNode(6), issueNode(7)] } });
+        f.assignees.set("o/r#5", ["burkeholland", "helper"]);
+        f.assignees.set("o/r#7", ["helper"]);
+        const { run, calls } = fakeGh({
+            "issue edit": ({ args }) => {
+                const key = `o/r#${args[2]}`;
+                const current = f.assignees.get(key) ?? [];
+                f.assignees.set(key, args.includes("--add-assignee") ? [...current, args.at(-1)] : current.filter(login => login !== args.at(-1)));
+                if (args[2] === "7" && args.includes("--add-assignee") && failure === "write response") throw new Error("Write response lost");
+                return "";
+            },
+            "repos/o/r/issues/": ({ args }) => {
+                const number = Number(args.at(-1).split("/").at(-1));
+                const assignees = f.assignees.get(`o/r#${number}`) ?? [];
+                if (number === 7 && assignees.includes("burkeholland")) throw new Error("Verification failed");
+                return { state: "open", assignees: assignees.map(login => ({ login })) };
+            },
+        });
+        const gh = createGitHub({ run });
+        Object.assign(f.github, { assign: gh.assign, unassign: gh.unassign });
+        await assert.rejects(f.hub.startSessions({ items: [5, 6, 7].map(number => ({ repository: "o/r", number })) }), /no sessions were started/);
+        assert.equal(prompts.length, 0);
+        assert.deepEqual(f.assignees.get("o/r#5"), ["burkeholland", "helper"], "leave the pre-existing viewer assignment alone");
+        assert.deepEqual(f.assignees.get("o/r#6"), [], "roll back earlier successful claims");
+        assert.deepEqual(f.assignees.get("o/r#7"), ["helper"], "roll back the failing claim without removing other assignees");
+        assert.deepEqual(calls.filter(args => args[0] === "issue").map(args => [args[2], args.at(-2)]), [
+            ["6", "--add-assignee"], ["7", "--add-assignee"], ["7", "--remove-assignee"], ["6", "--remove-assignee"],
+        ]);
+    });
+}
+
+test("an unverified claim rollback reports the affected issue and both failures", async () => {
+    let written = false;
+    const { run } = fakeGh({
+        "repos/o/r/issues/5": () => {
+            if (written) throw new Error("Verification failed");
+            return { state: "open", assignees: [] };
+        },
+        "issue edit": ({ args }) => {
+            if (args.includes("--remove-assignee")) throw new Error("Removal denied");
+            written = true;
+            return "";
+        },
+    });
+    await assert.rejects(createGitHub({ run }).assign({ repository: "o/r", number: 5, login: "burkeholland", additional: true, rollbackOnFailure: true }),
+        error => error.code === "write_uncertain" && /o\/r#5/.test(error.message) && /Verification failed/.test(error.message) && /Removal denied/.test(error.message));
+});
+
 test("the action endpoint accepts long comments but caps bodies at 256 KiB", async () => {
     const f = editHub();
     await f.hub.refresh(); await settle(f.hub);
@@ -1126,4 +1219,139 @@ test("expanded item lists start at the card edge and labels shrink before titles
     const app = await readFile(new URL("../assets/app.mjs", import.meta.url), "utf8");
     // +N sits outside the shrinking pill strip so it never gets clipped.
     assert.match(app, /<\/span>\$\{more \? `<span class="lbl-more"/);
+});
+
+const appSource = await readFile(new URL("../assets/app.mjs", import.meta.url), "utf8");
+const flushClient = () => new Promise(resolve => setImmediate(resolve));
+
+function clientElement() {
+    const classes = new Set();
+    const attributes = new Map();
+    return {
+        dataset: {}, children: [], hidden: true, innerHTML: "", value: "",
+        classList: {
+            add: name => classes.add(name),
+            remove: name => classes.delete(name),
+            contains: name => classes.has(name),
+            toggle(name, on) { if (on) classes.add(name); else classes.delete(name); },
+        },
+        setAttribute: (name, value) => attributes.set(name, value),
+        getAttribute: name => attributes.get(name),
+        hasAttribute: name => attributes.has(name),
+        addEventListener() {},
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        contains: () => false,
+    };
+}
+
+function clientFixture() {
+    const elements = new Map(["theme-toggle", "roster", "scope-q", "scope-backdrop", "detail", "person", "home", "tickets", "triage-count", "triage-all", "bulkbar", "toast", "composer-text"].map(id => [id, clientElement()]));
+    const requests = [];
+    const app = runInNewContext(
+        appSource.split("// ---- Boot ----")[0].replace(/^import .+ from ".+";\r?$/gm, "") + `
+        renderMeta = () => {};
+        renderRoster = () => {};
+        fitNow = () => {};
+        ({
+            setState(next) { S = next; compute(); },
+            view(key, data = null) { route.item = key; route.data = data; },
+            setSelected, renderTriage, startSessions, toggleLabel, postComment,
+            undo: () => undoAction?.(), busy, drafts,
+        });`,
+        {
+            AGENT, canonLogin, computeLoad, loadOf, tone, meterScale, sortRoster, sortForAssign,
+            ago, shortRepo, parseItemUrl, loginPattern, repoPattern, labelSummary, planRowUpdate, ICONS: {},
+            document: {
+                documentElement: clientElement(), body: clientElement(), activeElement: null,
+                getElementById: id => elements.get(id) ?? null,
+                querySelector: () => ({ content: "test-nonce" }),
+                addEventListener() {},
+            },
+            window: { addEventListener() {} }, history: {}, addEventListener() {},
+            matchMedia: () => ({ matches: false, addEventListener() {} }),
+            ResizeObserver: class { observe() {} },
+            localStorage: { getItem: () => null, setItem() {} },
+            setTimeout: () => 1, clearTimeout() {},
+            fetch: async (url, options) => {
+                const deferred = Promise.withResolvers();
+                requests.push({ ...JSON.parse(options.body), ...deferred });
+                return { ok: true, json: () => deferred.promise };
+            },
+        },
+    );
+    return { app, elements, requests };
+}
+
+function clientState(assignees = []) {
+    return {
+        items: [normalizeIssue(issueNode(5, assignees), "o/r")],
+        tracking: { repos: ["o/r"], people: ["burkeholland"] },
+        directory: { people: [], repos: [] }, repoStatus: { "o/r": { status: "ready" } },
+    };
+}
+
+test("selecting an assigned issue exposes bulk controls even when triage is empty", () => {
+    const f = clientFixture();
+    f.app.setState(clientState(["burkeholland"]));
+    f.app.setSelected(["o/r#5"], true);
+    assert.equal(f.elements.get("bulkbar").hidden, false);
+    assert.match(f.elements.get("bulkbar").innerHTML, /Start 1 Copilot session/);
+    assert.equal(f.elements.get("triage-all").hidden, true);
+});
+
+test("bulk controls clear after starting the last unowned issue", async () => {
+    const f = clientFixture();
+    f.app.setState(clientState());
+    f.app.setSelected(["o/r#5"], true);
+    const pending = f.app.startSessions();
+    assert.match(f.elements.get("bulkbar").innerHTML, /Starting/);
+    f.requests[0].resolve({ state: clientState(["burkeholland"]), login: "burkeholland" });
+    await pending;
+    assert.equal(f.elements.get("bulkbar").hidden, true);
+    assert.equal(f.elements.get("triage-all").hidden, true);
+    assert.equal(f.app.busy.size, 0);
+});
+
+for (const target of [null, "o/r#6"]) {
+    test(`label Undo targets the original operation after navigating to ${target ?? "home"}`, async () => {
+        const f = clientFixture();
+        const data = { labels: [] };
+        const state = clientState();
+        f.app.setState(state);
+        f.app.view("o/r#5", data);
+        const pending = f.app.toggleLabel("o/r#5", "bug");
+        f.requests[0].resolve({ labels: [{ name: "bug" }], state });
+        await pending;
+        data.labels = [];
+        f.app.view(target, { labels: [{ name: "unrelated" }] });
+        const undo = f.app.undo();
+        const request = f.requests.find((entry, i) => i > 0 && entry.action === "label");
+        assert.ok(request, "Undo must send a write even when the original item is not open");
+        assert.deepEqual(request.input, { repository: "o/r", number: 5, label: "bug", add: false });
+        request.resolve({ labels: [], state });
+        await undo;
+    });
+}
+
+test("close with comment finishes after returning to a still-loading detail view", async () => {
+    const f = clientFixture();
+    f.app.setState(clientState());
+    f.app.view("o/r#5", { comments: { nodes: [], total: 0 } });
+    f.elements.get("composer-text").value = "Done";
+    f.app.drafts.set("o/r#5", "Done");
+    const pending = f.app.postComment({ thenState: "closed" });
+    f.app.view(null);
+    f.elements.delete("composer-text");
+    f.app.view("o/r#5");
+    f.requests[0].resolve({ comment: { id: 9 } });
+    await flushClient();
+    const request = f.requests.find(entry => entry.action === "set_item_state");
+    assert.ok(request, "a missing composer must not stop the close after posting the comment");
+    assert.deepEqual(request.input, { repository: "o/r", number: 5, state: "closed" });
+    request.resolve({ state: clientState(), itemState: "closed" });
+    await pending;
+    assert.equal(f.app.busy.size, 0);
+    assert.equal(f.app.drafts.has("o/r#5"), false);
+    assert.equal(f.elements.get("toast").classList.contains("is-error"), false);
 });

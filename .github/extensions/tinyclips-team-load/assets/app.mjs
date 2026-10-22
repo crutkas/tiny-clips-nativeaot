@@ -320,6 +320,7 @@ function renderTriage() {
     const loading = !S.items.length && repoLoading();
     el.setAttribute("aria-busy", String(!!loading));
     $("triage-count").textContent = loading ? "" : unowned.length;
+    renderBulk();
     if (loading) { el.innerHTML = skeletonRows(3); return; }
     if (!unowned.length && repoPartial()) {
         el.innerHTML = `<li class="all-clear">${icon("alert")}<strong>Some repos couldn’t load</strong><span>Unowned work there isn’t shown.</span></li>`;
@@ -347,7 +348,6 @@ function renderTriage() {
     }).join("");
     paintLabels(el);
     wirePicker(el);
-    renderBulk();
 }
 
 // ---- Bulk selection ----
@@ -587,7 +587,8 @@ async function postComment({ thenState = null } = {}) {
     try {
         const { comment } = await post("comment", { ...splitKey(key), body });
         drafts.delete(key);
-        if (route.item === key) $("composer-text").value = "";
+        const composer = route.item === key ? $("composer-text") : null;
+        if (composer) composer.value = "";
         unlock(key);
         const d = viewingData(key);
         if (d) { d.comments.nodes.push(comment); d.comments.total++; renderDetail(); }
@@ -645,10 +646,14 @@ async function setItemState(key, to, { undo = false } = {}) {
     }
 }
 
-async function toggleLabel(key, name, { undo = false } = {}) {
+function toggleLabel(key, name) {
     const d = viewingData(key);
-    if (!d || busy.has(key)) return;
-    const add = !d.labels.some(l => l.name.toLowerCase() === name.toLowerCase());
+    if (!d) return;
+    return setLabel(key, name, !d.labels.some(l => l.name.toLowerCase() === name.toLowerCase()));
+}
+
+async function setLabel(key, name, add, { undo = false } = {}) {
+    if (busy.has(key)) return;
     lock(key);
     try {
         const result = await post("label", { ...splitKey(key), label: name, add });
@@ -657,7 +662,7 @@ async function toggleLabel(key, name, { undo = false } = {}) {
         const now = viewingData(key);
         if (now) now.labels = result.labels;
         renderAll();
-        toast(`${add ? "Added" : "Removed"} label <b>${esc(name)}</b>`, undo ? {} : { undo: () => toggleLabel(key, name, { undo: true }) });
+        toast(`${add ? "Added" : "Removed"} label <b>${esc(name)}</b>`, undo ? {} : { undo: () => setLabel(key, name, !add, { undo: true }) });
         refreshItem(key);
     } catch (error) {
         unlock(key);

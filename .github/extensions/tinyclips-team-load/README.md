@@ -24,10 +24,10 @@ Use the sun/moon button beside Refresh to switch between light and dark themes. 
 | Remove an assignee | `gh issue edit N --repo o/r --remove-assignee <login>`, re-read to verify |
 | Move to another person | `reassign` with `repository`, `number`, `from` and target `login`; adds and verifies the new owner before removing the source, without replacing the full assignee list |
 | Start a session myself | assigns you, then `session.send({ prompt })` to the hosting conversation; rolls back the assignment if sending fails. It only rolls back an assignment it made itself. |
-| Start sessions (bulk) | `start_sessions` with `items[]`: assigns you to each issue, then one `session.send({ prompt })` listing every issue (repo, number, title, URL) and asking for one local Copilot coding session each. All or nothing: if a claim or the send fails, every assignment it made is undone. |
+| Start sessions (bulk) | `start_sessions` with `items[]`: assigns you to each issue, then one `session.send({ prompt })` listing every issue (repo, number, title, URL) and asking for one local Copilot coding session each. If a claim or the send fails, it rolls back new assignments, including the current claim when its write response or verification read fails. Existing assignments are preserved; an unverified rollback reports which issue to check on GitHub. |
 | Comment | `gh api POST repos/o/r/issues/N/comments` (body over stdin); Undo deletes it |
 | Delete a comment | `gh api DELETE repos/o/r/issues/comments/ID`, only your own and only on the item shown |
-| Labels | `gh api POST/DELETE repos/o/r/issues/N/labels`; only labels that already exist in the repo, re-read to verify |
+| Labels | `gh api POST/DELETE repos/o/r/issues/N/labels`; only labels that already exist in the repo, re-read to verify. The picker fetches all label pages (up to 1,000, with an explicit error above that limit); Undo targets the original issue even after navigation. |
 | Close / reopen | `gh issue\|pr close\|reopen N --repo o/r`, re-read to verify; merged PRs can't be reopened |
 | PR assignees | `gh api POST/DELETE repos/o/r/issues/N/assignees` (people only, not Copilot) |
 | Undo | reverses the last change: removes someone you just added, or puts back someone you just removed |
@@ -64,4 +64,4 @@ The canvas is served from a loopback server with a per-launch nonce, a host/orig
 node --test .github/extensions/tinyclips-team-load/tests/team-load.test.mjs .github/extensions/tinyclips-team-load/tests/momentum.test.mjs
 ```
 
-Tests mock `gh`; they never touch GitHub. Momentum request-state tests use a minimal DOM fixture and deferred responses to cover selection changes, tracking races, and same-selection stale-data fallback without browser dependencies.
+Tests mock `gh`; they never touch GitHub. Client request-state tests use minimal DOM fixtures and deferred responses to cover bulk controls, navigation during edits, label Undo, Momentum selection changes, tracking races, and same-selection stale-data fallback without browser dependencies.

@@ -66,8 +66,8 @@ const detailQuery = `query($owner:String!,$name:String!,$number:Int!){repository
       assignees(first:20){nodes{login avatarUrl(size:64) name}}
       comments(last:30){totalCount nodes{${commentFields}}}}
   }}}`;
-const repoLabelsQuery = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){
-  labels(first:100,orderBy:{field:NAME,direction:ASC}){totalCount nodes{name color description}}}}`;
+const repoLabelsQuery = `query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){
+  labels(first:100,after:$after,orderBy:{field:NAME,direction:ASC}){pageInfo{hasNextPage endCursor} nodes{name color description}}}}`;
 
 // Activity history for the momentum chart: lightweight reads, newest first, so paging can stop at the window start.
 const historyCommitsQuery = `query($owner:String!,$name:String!,$since:GitTimestamp!,$after:String){repository(owner:$owner,name:$name){
@@ -175,7 +175,8 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
             if (!connection.pageInfo.hasNextPage) return items;
             after = connection.pageInfo.endCursor;
         }
-        throw new TeamLoadError("coverage_limit", `${nwo} has more than ${PAGE_LIMIT * 100} open ${field}; counts would be incomplete.`);
+        const description = field === "labels" ? "labels" : `open ${field}`;
+        throw new TeamLoadError("coverage_limit", `${nwo} has more than ${PAGE_LIMIT * 100} ${description}; results would be incomplete.`);
     }
 
     async function fetchRepo(nwo) {
@@ -321,17 +322,30 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
 
     // `additional: false` is the triage guard (only an unowned issue can be claimed). `additional: true` adds
     // alongside existing assignees and is a no-op when the login is already assigned.
-    async function assign({ repository, number, login, additional = false, issuesOnly = false }) {
+    async function assign({ repository, number, login, additional = false, issuesOnly = false, rollbackOnFailure = false }) {
         const before = await readIssue({ repository, number });
         if (before.isPr && issuesOnly) throw new TeamLoadError("invalid_input", `${repository}#${number} is a pull request. Sessions can only be started for issues.`);
         if (before.isPr && (login === AGENT || !additional)) throw new TeamLoadError("invalid_input", login === AGENT ? "Copilot can only be assigned to issues." : "Only issues can be triaged from Team Load.");
         if (before.state !== "open") throw new TeamLoadError("conflict", `${repository}#${number} is closed.`);
         if (additional && before.assignees.includes(login)) return { assignees: before.assignees, added: false };
         if (!additional && before.assignees.length) throw new TeamLoadError("conflict", `${repository}#${number} is already assigned to ${before.assignees.map(l => l === AGENT ? "Copilot" : `@${l}`).join(", ")}.`);
-        await editAssignee({ repository, number, login, isPr: before.isPr }, "--add-assignee");
-        const after = await readIssue({ repository, number });
-        if (!after.assignees.includes(login)) throw new TeamLoadError("github_error", `GitHub accepted the change but ${login === AGENT ? "Copilot" : `@${login}`} is not assigned to ${repository}#${number}. Copilot may not be enabled for this repository.`);
-        return { assignees: after.assignees, added: true };
+        try {
+            await editAssignee({ repository, number, login, isPr: before.isPr }, "--add-assignee");
+            const after = await readIssue({ repository, number });
+            if (!after.assignees.includes(login)) throw new TeamLoadError("github_error", `GitHub accepted the change but ${login === AGENT ? "Copilot" : `@${login}`} is not assigned to ${repository}#${number}. Copilot may not be enabled for this repository.`);
+            return { assignees: after.assignees, added: true };
+        } catch (error) {
+            if (!rollbackOnFailure) throw error;
+            try {
+                // The pre-write checks guarantee this login was not already assigned. Compensate even if the write response was lost.
+                await editAssignee({ repository, number, login, isPr: before.isPr }, "--remove-assignee");
+                const restored = await readIssue({ repository, number });
+                if (restored.assignees.includes(login)) throw new TeamLoadError("github_error", `@${login} is still assigned.`);
+            } catch (cleanup) {
+                throw new TeamLoadError("write_uncertain", `Could not claim ${repository}#${number}, and undoing the claim could not be verified. @${login} may still be assigned; check it on GitHub. ${error.message} Rollback: ${cleanup.message}`);
+            }
+            throw error;
+        }
     }
 
     async function unassign({ repository, number, login }) {
@@ -387,11 +401,9 @@ export function createGitHub({ run = runGh, now = () => Date.now(), log = () => 
 
     const labelCache = new Map();
     async function repoLabels(repository, { force = false } = {}) {
-        const [owner, name] = split(repository);
         const cached = labelCache.get(repository.toLowerCase());
         if (cached && !force && now() - cached.at < 5 * 60_000) return cached.labels;
-        const data = await gql(repoLabelsQuery, { owner, name });
-        const list = (data.repository?.labels?.nodes ?? []).map(label => ({ ...labels({ nodes: [label] })[0], description: label.description || "" }));
+        const list = await paginate(repoLabelsQuery, repository, "labels", label => ({ ...labels({ nodes: [label] })[0], description: label.description || "" }));
         labelCache.set(repository.toLowerCase(), { at: now(), labels: list });
         return list;
     }
