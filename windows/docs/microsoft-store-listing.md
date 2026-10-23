@@ -126,9 +126,16 @@ only when the user enables the webcam for a video capture.
 3. Add the Store Product ID as the repository variable `MICROSOFT_STORE_PRODUCT_ID`. It is not the
    package identity or package family name; retrieve it with `msstore apps list` after configuring
    the CLI.
-4. Protect the `microsoft-store` environment with required reviewers. The
-   `windows-store-publish.yml` workflow packages every `v*-windows` tag and pauses before
-   submission. A manual dispatch can package without publishing, or publish after approval.
+4. Add the comma-separated Partner Center tester group IDs as the repository variable
+   `MICROSOFT_STORE_FLIGHT_GROUP_IDS`. The workflow uses these only when it needs to create the
+   `Internal Testing` flight; an existing flight and its tester groups are left unchanged.
+5. Protect the `microsoft-store` environment with required reviewers. The
+   `windows-store-publish.yml` workflow packages every `v*-windows` tag, pauses for approval to
+   submit the artifact to `Internal Testing`, then requires a separate approval before submitting
+   that same verified artifact to the main Store listing. A manual dispatch can package without
+   publishing, or submit to both stages after approval. If Partner Center has an unsubmitted
+   portal-created flight draft, it is preserved by default; a manual publish can explicitly opt in
+   to replacing only that `PendingCommit` draft.
 
 The workflow builds the Store flavor with its Store-assigned identity and submits the unsigned
 `.msixupload`; Microsoft Store signs the package and delivers updates.
