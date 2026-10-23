@@ -291,7 +291,12 @@ jobs:
                   -Headers $headers
               }
               catch {
-                throw "Partner Center could not list package flights. No submission was changed."
+                if ($skip -eq 0 -and $_.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
+                  $page = @{ value = @() }
+                }
+                else {
+                  throw "Partner Center could not list package flights. No submission was changed."
+                }
               }
               if ($null -eq $page.value) { throw "Partner Center returned no package-flight list." }
               $matchingFlights += @($page.value | Where-Object { $_.friendlyName -ceq "Internal Testing" })
@@ -355,7 +360,7 @@ jobs:
               catch {
                 throw "Partner Center could not read the pending Internal Testing submission."
               }
-              if ($submission.id -cne $submissionId -or $submission.flightId -cne $flightId) {
+              if ($submission.id -cne $submissionId) {
                 throw "Partner Center returned an unexpected flight submission."
               }
               if ($submission.status -notin @("PendingCommit", "CommitFailed")) {
