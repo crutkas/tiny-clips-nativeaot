@@ -12,6 +12,7 @@ own `CHANGELOG.md` at the repository root.
 - Windows CI no longer builds for README/changelog-only or unrelated configuration changes, and skips whole Windows jobs when no build inputs changed.
 
 ### Changed
+- Ordinary Windows CI now cancels superseded runs per PR/branch and caches only NuGet packages with separate keys for direct x64/ARM64, Store x64, and tests, including SDK and dependency inputs. All package inspections and test suites remain enabled; release, Store publishing, and launch smoke are unchanged.
 - Added an opt-in local-NVMe ReFS Dev Drive pilot to ARM64 build-mode Windows Launch Smoke
   jobs, moving the workspace, temporary files, and NuGet caches before checkout. Other builds
   keep their existing storage; the pilot warns and falls back if no suitable disk is available.

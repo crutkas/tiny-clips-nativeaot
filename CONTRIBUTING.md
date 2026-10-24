@@ -99,6 +99,19 @@ Copilot app configuration, extensions, and standalone tooling outside those inpu
 also skip platform builds. Manually dispatching **Windows Build** still forces its
 builds and tests. Release/tag and other manually triggered workflows are unchanged.
 
+Ordinary **Build** and **Windows Build** runs cancel superseded runs for the same
+pull request or branch, independently per workflow. This does not cancel release,
+Store publishing, or launch-smoke workflows.
+
+Windows CI caches only NuGet packages in a job-local directory, not build outputs,
+MSIX files, or the runner's preinstalled package cache. Separate keys cover direct
+x64, direct ARM64, Store x64, and tests, with the runner OS/architecture, resolved
+.NET SDK version, and dependency inputs in each key. Exact-key restores avoid
+carrying obsolete packages into new dependency sets. Restore still runs on cache
+hits to regenerate each job's assets with its original build-flavor properties;
+cache misses use normal NuGet downloads. These changes target turnaround time and
+runner capacity, not dollar savings on standard hosted runners in this public repo.
+
 ### Building without code signing (CI / headless)
 
 ```bash
