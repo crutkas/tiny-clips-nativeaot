@@ -86,14 +86,26 @@ public static class RegionSelectController
             }
         }
 
-        for (var i = 0; i < monitors.Count; i++)
+        try
         {
-            windows.Add(new RegionSelectWindow(monitors[i], backdrops[i], Complete));
-        }
+            for (var i = 0; i < monitors.Count; i++)
+            {
+                windows.Add(new RegionSelectWindow(monitors[i], backdrops[i], Complete));
+            }
 
-        foreach (var window in windows)
+            foreach (var window in windows)
+            {
+                window.Activate();
+            }
+        }
+        catch
         {
-            window.Activate();
+            foreach (var window in windows)
+            {
+                window.CloseFromController();
+            }
+
+            throw;
         }
 
         var dispatcher = DispatcherQueue.GetForCurrentThread();

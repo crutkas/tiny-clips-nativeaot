@@ -6,6 +6,7 @@ own `CHANGELOG.md` at the repository root.
 ## [Unreleased]
 
 ### Fixed
+- Recording still stops and finalizes if Windows cannot safely show the processing indicator. Multi-monitor region selection closes already-created overlays if a later overlay cannot be created or activated.
 - Windows CI no longer builds for README/changelog-only or unrelated configuration changes, and skips whole Windows jobs when no build inputs changed.
 
 ### Changed

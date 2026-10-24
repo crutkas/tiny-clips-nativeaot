@@ -2974,7 +2974,18 @@ public partial class App : Application
     {
         HideProcessingIndicator();
 
-        var window = new ProcessingIndicatorWindow(type);
+        ProcessingIndicatorWindow window;
+        try
+        {
+            window = new ProcessingIndicatorWindow(type);
+        }
+        catch (CaptureVisibilityException ex)
+        {
+            Debug.WriteLine($"Processing indicator capture visibility failed: {ex}");
+            ShowMessageNotification("Windows couldn't show the processing indicator safely. Your recording is still being finalized.");
+            return;
+        }
+
         window.Closed += (_, _) =>
         {
             if (ReferenceEquals(_processingIndicator, window))
