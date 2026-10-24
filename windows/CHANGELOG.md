@@ -6,6 +6,8 @@ own `CHANGELOG.md` at the repository root.
 ## [Unreleased]
 
 ### Fixed
+- Failed or cancelled scrolling-capture setup now closes its panel and removes service subscriptions so subsequent captures are not blocked.
+- StudioWindowCheck builds with the capture inclusion setting and keeps its test window capturable.
 - Recording still stops and finalizes if Windows cannot safely show the processing indicator. Multi-monitor region selection closes already-created overlays if a later overlay cannot be created or activated.
 - Windows CI no longer builds for README/changelog-only or unrelated configuration changes, and skips whole Windows jobs when no build inputs changed.
 

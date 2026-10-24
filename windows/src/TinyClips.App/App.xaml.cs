@@ -1405,6 +1405,11 @@ public partial class App : Application
         catch (OperationCanceledException)
         {
             CaptureFlowTrace.Mark("flow cancelled");
+            if (_scrollingPanel is not null)
+            {
+                Services.GetRequiredService<IScrollingCaptureService>().Cancel();
+                FinishScrollingCapture(null);
+            }
             _ = DiscardPreparedRecordersAsync();
             CloseRecordingRegionIndicator();
             HideRecordingIndicatorIfNotRecording();
@@ -1421,6 +1426,11 @@ public partial class App : Application
         {
             Debug.WriteLine($"Capture failed: {ex}");
             CaptureFlowTrace.Mark($"flow failed: {ex.GetType().Name}");
+            if (_scrollingPanel is not null)
+            {
+                Services.GetRequiredService<IScrollingCaptureService>().Cancel();
+                FinishScrollingCapture(null);
+            }
             _ = DiscardPreparedRecordersAsync();
             if (ex is CaptureVisibilityException)
             {

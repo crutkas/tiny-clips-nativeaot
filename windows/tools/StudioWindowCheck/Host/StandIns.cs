@@ -7,6 +7,14 @@ using TinyClips.Core.Studio;
 // The stand-ins for what the tool leaves out of the app. Each is listed in README.md.
 namespace TinyClips.App
 {
+    // The tool reads its own Studio window through WGC, so it must remain capturable.
+    internal static class WindowCaptureVisibility
+    {
+        public static void Register(Microsoft.UI.Xaml.Window window)
+        {
+        }
+    }
+
     /// <summary>
     /// Stands in for the app's <c>Infrastructure\WindowIcon.cs</c>, which WindowChromeController
     /// calls when a window is first activated. The app's class writes to the app's crash log when
