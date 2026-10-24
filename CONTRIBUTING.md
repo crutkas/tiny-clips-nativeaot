@@ -100,8 +100,10 @@ also skip platform builds. Manually dispatching **Windows Build** still forces i
 builds and tests. Release/tag and other manually triggered workflows are unchanged.
 
 Ordinary **Build** and **Windows Build** runs cancel superseded runs for the same
-pull request or branch, independently per workflow. This does not cancel release,
-Store publishing, or launch-smoke workflows.
+pull request, independently per workflow. Non-pull-request runs use unique
+concurrency groups, so a later documentation-only push cannot cancel an earlier
+push that still needs platform validation. This does not cancel release, Store
+publishing, or launch-smoke workflows.
 
 The Windows test job caches only NuGet packages in a job-local directory, not build
 outputs or the runner's preinstalled package cache. Its key includes the runner
