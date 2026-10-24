@@ -28,6 +28,7 @@ public sealed partial class RecordingIndicatorWindow : Window
     public RecordingIndicatorWindow(string stopHint)
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         _stopHintText = string.IsNullOrWhiteSpace(stopHint)
             ? "Stop from tray"
@@ -63,7 +64,6 @@ public sealed partial class RecordingIndicatorWindow : Window
         // Exclude the floating panel from screen capture so it never appears in the
         // recorded video/GIF.
         var hwnd = WindowNative.GetWindowHandle(this);
-        OverlayWindowHelpers.ExcludeFromCapture(hwnd);
     }
 
     public void UpdateElapsed(TimeSpan elapsed)

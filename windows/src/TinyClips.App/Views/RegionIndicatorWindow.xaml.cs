@@ -9,8 +9,7 @@ namespace TinyClips.App;
 
 /// <summary>
 /// Borderless, always-on-top outline shown around a selected region during countdown.
-/// The window is click-through (never absorbs mouse input) and excluded from screen
-/// capture so it does not appear in recordings or screenshots.
+/// The window is click-through; capture visibility follows the session's inclusion preference.
 /// </summary>
 public sealed partial class RegionIndicatorWindow : Window
 {
@@ -29,6 +28,7 @@ public sealed partial class RegionIndicatorWindow : Window
     public RegionIndicatorWindow()
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         ConfigurePresenter();
         Closed += OnClosed;
@@ -107,16 +107,13 @@ public sealed partial class RegionIndicatorWindow : Window
 
     /// <summary>
     /// Makes the overlay click-through (so it never steals mouse input, mirroring the
-    /// macOS <c>ignoresMouseEvents</c>) and excludes it from screen capture so it stays
-    /// invisible in the recorded video/GIF/screenshot.
+    /// macOS <c>ignoresMouseEvents</c>).
     /// </summary>
     private static void ApplyOverlayStyles(nint hwnd)
     {
         var exStyle = (long)GetWindowLongPtr(hwnd, GwlExStyle);
         var newStyle = (nint)(exStyle | WsExLayered | WsExTransparent);
         SetWindowLongPtr(hwnd, GwlExStyle, newStyle);
-
-        OverlayWindowHelpers.ExcludeFromCapture(hwnd);
     }
 
     // 32/64-bit-safe GetWindowLongPtr / SetWindowLongPtr wrappers. On 32-bit Windows the

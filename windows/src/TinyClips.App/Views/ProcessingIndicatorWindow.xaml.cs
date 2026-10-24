@@ -10,8 +10,7 @@ namespace TinyClips.App;
 /// <summary>
 /// Small always-on-top panel shown after the user stops a recording while the clip is being
 /// encoded/finalized. Mirrors <see cref="RecordingIndicatorWindow"/>'s floating-panel recipe:
-/// borderless, always-on-top, positioned near the top of the primary work area, and excluded
-/// from screen capture.
+/// borderless, always-on-top, and positioned near the top of the primary work area.
 /// </summary>
 public sealed partial class ProcessingIndicatorWindow : Window
 {
@@ -26,6 +25,7 @@ public sealed partial class ProcessingIndicatorWindow : Window
     public ProcessingIndicatorWindow(CaptureType type)
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         CaptionText.Text = type == CaptureType.Gif
             ? "Finalizing your GIF"
@@ -45,9 +45,7 @@ public sealed partial class ProcessingIndicatorWindow : Window
         var scale = PositionNearMonitorWorkArea(monitor, regionInVirtualDesktop);
         AppWindow.Show(false);
 
-        // Keep the panel out of any concurrent capture.
         var hwnd = WindowNative.GetWindowHandle(this);
-        OverlayWindowHelpers.ExcludeFromCapture(hwnd);
 
         // Clip the window to the card's rounded corners so the acrylic backdrop doesn't show as a
         // square frame around the rounded border. This runs after the first present: applying

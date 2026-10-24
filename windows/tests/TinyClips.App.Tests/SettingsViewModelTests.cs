@@ -8,6 +8,39 @@ namespace TinyClips.App.Tests;
 public sealed class SettingsViewModelTests
 {
     [Fact]
+    public void IncludeTinyClips_LoadsWithGeneral_PersistsAndResetsWithoutRealizationWrites()
+    {
+        var fixture = new Fixture();
+        fixture.Settings.IncludeTinyClipsInCapture = true;
+        var vm = fixture.CreateViewModel();
+        var writes = fixture.Store.Writes;
+        var general = vm.BeginSectionRealization(SettingsSectionKind.General);
+        vm.IncludeTinyClipsInCapture = false;
+        vm.CompleteSectionRealization(general);
+
+        Assert.True(vm.IncludeTinyClipsInCapture);
+        Assert.True(fixture.Settings.IncludeTinyClipsInCapture);
+        Assert.Equal(writes, fixture.Store.Writes);
+        vm.IncludeTinyClipsInCapture = false;
+        Assert.False(fixture.Settings.IncludeTinyClipsInCapture);
+        vm.IncludeTinyClipsInCapture = true;
+        Assert.True(fixture.Settings.IncludeTinyClipsInCapture);
+        vm.ResetAllSettings();
+        Assert.False(vm.IncludeTinyClipsInCapture);
+        Assert.False(fixture.Settings.IncludeTinyClipsInCapture);
+    }
+
+    [Fact]
+    public void IncludeTinyClipsToggle_HasAccessibleNameAndTwoWayBinding()
+    {
+        var toggle = Assert.Single(SettingsMarkup.Elements("GeneralSettingsSection.xaml"),
+            element => element.Attr("AutomationProperties.AutomationId") == "IncludeTinyClipsInCaptureToggle");
+        Assert.Equal("ToggleSwitch", toggle.Name.LocalName);
+        Assert.Equal("Include Tiny Clips in captures", toggle.Attr("AutomationProperties.Name"));
+        Assert.Equal("{x:Bind ViewModel.IncludeTinyClipsInCapture, Mode=TwoWay}", toggle.Attr("IsOn"));
+    }
+
+    [Fact]
     public void FirstLoadAndUnrelatedRealizations_DoNotReadExternalState()
     {
         var fixture = new Fixture();

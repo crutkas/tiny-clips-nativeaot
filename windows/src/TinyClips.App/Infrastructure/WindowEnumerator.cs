@@ -23,7 +23,9 @@ internal static class WindowEnumerator
 
         EnumWindows((hwnd, _) =>
         {
-            if (hwnd == ownHwnd || !IsWindowVisible(hwnd) || IsIconic(hwnd))
+            GetWindowThreadProcessId(hwnd, out var processId);
+            if (!WindowCaptureVisibility.Policy.CanSelectWindow(processId == Environment.ProcessId, hwnd, ownHwnd)
+                || !IsWindowVisible(hwnd) || IsIconic(hwnd))
             {
                 return true;
             }
@@ -61,6 +63,9 @@ internal static class WindowEnumerator
     }
 
     private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);

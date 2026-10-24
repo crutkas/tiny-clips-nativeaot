@@ -277,7 +277,13 @@ public partial class App : Application
         // mid-operation failure could leave app state partially mutated, so we let it terminate.
         UnhandledException += (_, e) =>
         {
-            var handled = _isInStartupPhase && !_isExiting;
+            // Visibility registration closes the failed window before propagating this error.
+            var visibilityFailure = e.Exception is CaptureVisibilityException;
+            var handled = visibilityFailure || (_isInStartupPhase && !_isExiting);
+            if (visibilityFailure)
+            {
+                ShowMessageNotification($"{e.Exception.Message} The window was not opened.");
+            }
             Debug.WriteLine($"Unhandled XAML exception (startup={_isInStartupPhase}): {e.Exception}");
             CrashDiagnostics.Log("Application.UnhandledException", e.Exception, handled);
             e.Handled = handled;
@@ -1204,8 +1210,6 @@ public partial class App : Application
         {
             CaptureFlowTrace.Begin(type.ToString().ToLowerInvariant() + (forcedMode is null ? string.Empty : $"/{forcedMode}"));
 
-            // The tray popup and picker are excluded from capture (WDA_EXCLUDEFROMCAPTURE), so
-            // there is no longer any need to pause for the menu to dismiss before capturing.
             // Warm the shared D3D capture device in the background so the first capture is fast.
             Services.GetRequiredService<IScreenCaptureService>().WarmUp();
 
@@ -1216,6 +1220,7 @@ public partial class App : Application
             }
 
             var settings = Services.GetRequiredService<ICaptureSettings>();
+            WindowCaptureVisibility.Policy.BeginCapture(settings.IncludeTinyClipsInCapture, IsAnyRecordingActive());
             var (cdEnabled, cdDuration) = GetCountdown(settings, type);
             var wasPickerInitiated = forcedMode is null && settings.ShouldShowCapturePicker(type);
             if (wasPickerInitiated)
@@ -1400,6 +1405,11 @@ public partial class App : Application
         catch (OperationCanceledException)
         {
             CaptureFlowTrace.Mark("flow cancelled");
+            if (_scrollingPanel is not null)
+            {
+                Services.GetRequiredService<IScrollingCaptureService>().Cancel();
+                FinishScrollingCapture(null);
+            }
             _ = DiscardPreparedRecordersAsync();
             CloseRecordingRegionIndicator();
             HideRecordingIndicatorIfNotRecording();
@@ -1416,8 +1426,20 @@ public partial class App : Application
         {
             Debug.WriteLine($"Capture failed: {ex}");
             CaptureFlowTrace.Mark($"flow failed: {ex.GetType().Name}");
+            if (_scrollingPanel is not null)
+            {
+                Services.GetRequiredService<IScrollingCaptureService>().Cancel();
+                FinishScrollingCapture(null);
+            }
             _ = DiscardPreparedRecordersAsync();
-            ShowSaveFailureNotification(CaptureOutputDescription(type));
+            if (ex is CaptureVisibilityException)
+            {
+                ShowMessageNotification($"{ex.Message} Capture was cancelled.");
+            }
+            else
+            {
+                ShowSaveFailureNotification(CaptureOutputDescription(type));
+            }
             UpdateRecordingState();
             CloseRecordingRegionIndicator();
             _activeRecordingSelection = null;
@@ -2962,7 +2984,18 @@ public partial class App : Application
     {
         HideProcessingIndicator();
 
-        var window = new ProcessingIndicatorWindow(type);
+        ProcessingIndicatorWindow window;
+        try
+        {
+            window = new ProcessingIndicatorWindow(type);
+        }
+        catch (CaptureVisibilityException ex)
+        {
+            Debug.WriteLine($"Processing indicator capture visibility failed: {ex}");
+            ShowMessageNotification("Windows couldn't show the processing indicator safely. Your recording is still being finalized.");
+            return;
+        }
+
         window.Closed += (_, _) =>
         {
             if (ReferenceEquals(_processingIndicator, window))

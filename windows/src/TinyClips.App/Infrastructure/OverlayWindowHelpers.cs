@@ -26,7 +26,10 @@ internal static class OverlayWindowHelpers
     /// DllImport preserves the Win32 last-error via <c>SetLastError = true</c>.
     /// </summary>
     public static bool ExcludeFromCapture(nint hwnd) =>
-        SetWindowDisplayAffinity(hwnd, WdaExcludeFromCapture);
+        SetCaptureExcluded(hwnd, true);
+
+    public static bool SetCaptureExcluded(nint hwnd, bool excluded) =>
+        SetWindowDisplayAffinity(hwnd, excluded ? WdaExcludeFromCapture : 0);
 
     /// <summary>
     /// Clips a borderless overlay to a rounded rectangle.

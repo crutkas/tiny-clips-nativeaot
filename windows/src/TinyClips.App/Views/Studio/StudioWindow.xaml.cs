@@ -79,6 +79,7 @@ public sealed partial class StudioWindow : Window
         _onClosed = onClosed;
 
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         // The Project button has the picture of the Project panel, as the rail has it.
         ProjectMenuIcon.Glyph = StudioInspectorPanels.GetGlyph(StudioInspectorPanel.Project);

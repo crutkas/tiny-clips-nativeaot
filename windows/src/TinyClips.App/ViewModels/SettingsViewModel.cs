@@ -761,6 +761,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _showBrandingOverlay;
 
+    [ObservableProperty]
+    private bool _includeTinyClipsInCapture;
+
     // Teleprompter
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TeleprompterTranscriptEditorEnabled))]
@@ -1273,6 +1276,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 ConfirmEditorEscape = _settings.ConfirmEditorEscape;
                 LaunchAtLogin = _settings.LaunchAtLogin;
                 ShowBrandingOverlay = _settings.ShowBrandingOverlay;
+                IncludeTinyClipsInCapture = _settings.IncludeTinyClipsInCapture;
                 MultiMonitorCaptureModeIndex = _settings.MultiMonitorCaptureMode switch
                 {
                     MultiMonitorCaptureMode.UnderCursor => 1,
@@ -2027,6 +2031,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnGifMouseClickColorHexChanged(string value) => Persist(SettingsSectionKind.MouseClicks, () => _settings.GifMouseClickColorHex = value);
 
     partial void OnShowBrandingOverlayChanged(bool value) => Persist(SettingsSectionKind.General, () => _settings.ShowBrandingOverlay = value);
+
+    partial void OnIncludeTinyClipsInCaptureChanged(bool value) => Persist(SettingsSectionKind.General, () => _settings.IncludeTinyClipsInCapture = value);
 
     partial void OnTeleprompterEnabledChanged(bool value) => Persist(SettingsSectionKind.Teleprompter, () => _settings.TeleprompterEnabled = value);
 

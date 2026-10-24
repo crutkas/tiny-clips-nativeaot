@@ -153,6 +153,16 @@
             <StackPanel Spacing="2">
 
                 <controls:SettingsCard
+                    Description="For demos, let Tiny Clips windows and controls appear in screenshots and recordings. Applies to the next capture after any active recording ends. The teleprompter and live webcam preview stay hidden; the recorded camera is unchanged."
+                    Header="Include Tiny Clips in captures"
+                    HeaderIcon="{ui:FontIcon Glyph=&#xE714;}">
+                    <ToggleSwitch
+                        AutomationProperties.AutomationId="IncludeTinyClipsInCaptureToggle"
+                        AutomationProperties.Name="Include Tiny Clips in captures"
+                        IsOn="{x:Bind ViewModel.IncludeTinyClipsInCapture, Mode=TwoWay}" />
+                </controls:SettingsCard>
+
+                <controls:SettingsCard
                     Description="Add a small Tiny Clips watermark to the corner of captures."
                     Header="Branding overlay"
                     HeaderIcon="{ui:FontIcon Glyph=&#xE7C1;}">

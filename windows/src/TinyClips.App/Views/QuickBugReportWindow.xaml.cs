@@ -33,6 +33,7 @@ public sealed partial class QuickBugReportWindow : Window
 		_distribution = distribution;
 
 		InitializeComponent();
+		WindowCaptureVisibility.Register(this);
 
 		ExtendsContentIntoTitleBar = true;
 		SetTitleBar(AppTitleBar);

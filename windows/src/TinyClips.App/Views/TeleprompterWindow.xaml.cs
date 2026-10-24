@@ -49,6 +49,7 @@ public sealed partial class TeleprompterWindow : Window
         MonitorInfo? monitor)
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this, alwaysExcluded: true);
 
         _settings = settings;
         _monitorService = monitorService;

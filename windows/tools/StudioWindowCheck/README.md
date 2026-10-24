@@ -214,6 +214,8 @@ Someone may be working on the machine while the tool runs, so:
 ## What is not the app
 
 - `Host\StandIns.cs` has what the tool leaves out of the app:
+  - `WindowCaptureVisibility`: registration is a no-op so the tool can capture its own Studio
+    window through Windows.Graphics.Capture, independent of the app's capture inclusion setting.
   - `WindowIcon`: the app's class writes to the app's crash log when the icon cannot be set. The
     tool's windows are not in the taskbar and need no icon.
   - `MemorySettings`: the app's settings, in memory. They start with the Studio preview switch on,

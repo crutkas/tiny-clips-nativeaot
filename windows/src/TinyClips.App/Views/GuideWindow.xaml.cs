@@ -21,6 +21,7 @@ public sealed partial class GuideWindow : Window
     public GuideWindow()
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);

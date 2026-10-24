@@ -68,6 +68,7 @@ public sealed partial class SettingsWindow : Window
         using (_openTrace?.Measure(WindowOpenPhase.Xaml))
         {
             InitializeComponent();
+            WindowCaptureVisibility.Register(this);
         }
 
         WindowOpenDiagnostics.Observe(this, RootGrid, _openTrace);
