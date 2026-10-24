@@ -11,9 +11,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
-
 jobs:
   changes:
     name: Detect Windows changes
@@ -69,16 +66,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        id: dotnet
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.NUGET_PACKAGES }}
-          key: nuget-v1-${{ runner.os }}-${{ runner.arch }}-direct-${{ matrix.rid }}-sdk-${{ steps.dotnet.outputs.dotnet-version }}-${{ hashFiles('global.json', 'windows/**/*.csproj', 'windows/**/*.props', 'windows/**/*.targets', 'windows/**/*.pubxml', 'windows/**/packages.lock.json', '**/[Nn]u[Gg]et.[Cc]onfig') }}
 
       - name: Restore direct app for ${{ matrix.platform }}
         run: >-
@@ -130,16 +120,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        id: dotnet
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.NUGET_PACKAGES }}
-          key: nuget-v1-${{ runner.os }}-${{ runner.arch }}-store-win-x64-sdk-${{ steps.dotnet.outputs.dotnet-version }}-${{ hashFiles('global.json', 'windows/**/*.csproj', 'windows/**/*.props', 'windows/**/*.targets', 'windows/**/*.pubxml', 'windows/**/packages.lock.json', '**/[Nn]u[Gg]et.[Cc]onfig') }}
 
       - name: Build framework-dependent Store flavor
         run: >-
@@ -159,6 +142,8 @@ jobs:
     runs-on: windows-latest
     needs: [changes, build, store-build]
     if: ${{ needs.changes.outputs.windows == 'true' }}
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
     steps:
       - name: Checkout code

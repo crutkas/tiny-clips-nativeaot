@@ -103,14 +103,14 @@ Ordinary **Build** and **Windows Build** runs cancel superseded runs for the sam
 pull request or branch, independently per workflow. This does not cancel release,
 Store publishing, or launch-smoke workflows.
 
-Windows CI caches only NuGet packages in a job-local directory, not build outputs,
-MSIX files, or the runner's preinstalled package cache. Separate keys cover direct
-x64, direct ARM64, Store x64, and tests, with the runner OS/architecture, resolved
-.NET SDK version, and dependency inputs in each key. Exact-key restores avoid
-carrying obsolete packages into new dependency sets. Restore still runs on cache
-hits to regenerate each job's assets with its original build-flavor properties;
-cache misses use normal NuGet downloads. These changes target turnaround time and
-runner capacity, not dollar savings on standard hosted runners in this public repo.
+The Windows test job caches only NuGet packages in a job-local directory, not build
+outputs or the runner's preinstalled package cache. Its key includes the runner
+OS/architecture, resolved .NET SDK version, target architecture, and dependency
+inputs. Exact-key restores avoid carrying obsolete packages into new dependency
+sets, and both test-project restores still run on hits. Direct x64/ARM64 and Store
+builds use normal NuGet restore without caching: measured cache transfer overhead
+outweighed their restore savings. These changes target turnaround time and runner
+capacity, not dollar savings on standard hosted runners in this public repo.
 
 ### Building without code signing (CI / headless)
 
