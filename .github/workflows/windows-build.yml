@@ -245,11 +245,11 @@ jobs:
           $locals | Tee-Object (Join-Path $evidence 'nuget-effective.txt')
           $paths = [ordered]@{
             workspace = $env:GITHUB_WORKSPACE
-            temp = $env:RUNNER_TEMP
+            runnerTemp = $env:RUNNER_TEMP
             userProfile = $env:USERPROFILE
           }
           foreach ($line in $locals) {
-            if ($line -match '^([^:]+): (.+)$') { $paths[$Matches[1]] = $Matches[2] }
+            if ($line -match '^([^:]+): (.+)$') { $paths["nuget-$($Matches[1])"] = $Matches[2] }
           }
           $resolvedPaths = foreach ($entry in $paths.GetEnumerator()) {
             $path = [IO.Path]::GetFullPath($entry.Value)
