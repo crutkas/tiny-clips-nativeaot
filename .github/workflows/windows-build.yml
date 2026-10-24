@@ -6,6 +6,11 @@ on:
   push:
     branches: [main, develop]
   workflow_dispatch:
+    inputs:
+      nuget_location_benchmark:
+        description: Run only the bounded x64 NuGet location experiment (no publishing)
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -14,6 +19,7 @@ concurrency:
 jobs:
   changes:
     name: Detect Windows changes
+    if: ${{ inputs.nuget_location_benchmark != true }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
@@ -182,3 +188,157 @@ jobs:
     steps:
       - name: Report successful skip
         run: echo "No Windows files changed; skipping the Windows build and tests."
+
+  nuget-location-benchmark:
+    name: NuGet location (${{ matrix.location }}, trial ${{ matrix.trial }})
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.nuget_location_benchmark == true }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        location: [default, runner-temp]
+        trial: [1, 2]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.402
+
+      - name: Record environment and select cache location
+        shell: pwsh
+        env:
+          CACHE_LOCATION: ${{ matrix.location }}
+          TRIAL: ${{ matrix.trial }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') {
+            throw 'This experiment requires a fresh GitHub-hosted Windows runner.'
+          }
+          $evidence = Join-Path $env:RUNNER_TEMP 'nuget-location-evidence'
+          New-Item -ItemType Directory -Path $evidence | Out-Null
+          "EVIDENCE=$evidence" >> $env:GITHUB_ENV
+          dotnet --info | Tee-Object (Join-Path $evidence 'dotnet-info.txt')
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet --info failed.' }
+          dotnet nuget locals all --list | Tee-Object (Join-Path $evidence 'nuget-before.txt')
+          if ($LASTEXITCODE -ne 0) { throw 'NuGet location discovery failed.' }
+          if ($env:NUGET_PACKAGES -or $env:NUGET_HTTP_CACHE_PATH) {
+            throw 'Unexpected inherited NuGet override would confound the baseline.'
+          }
+          $selection = [Diagnostics.Stopwatch]::StartNew()
+          if ($env:CACHE_LOCATION -eq 'runner-temp') {
+            $root = Join-Path $env:RUNNER_TEMP "nuget-location-$env:GITHUB_RUN_ID-$env:TRIAL"
+            $env:NUGET_PACKAGES = Join-Path $root 'packages'
+            $env:NUGET_HTTP_CACHE_PATH = Join-Path $root 'http-cache'
+            New-Item -ItemType Directory -Path $env:NUGET_PACKAGES, $env:NUGET_HTTP_CACHE_PATH | Out-Null
+            "NUGET_PACKAGES=$env:NUGET_PACKAGES" >> $env:GITHUB_ENV
+            "NUGET_HTTP_CACHE_PATH=$env:NUGET_HTTP_CACHE_PATH" >> $env:GITHUB_ENV
+          }
+          $selection.Stop()
+          $locals = @(dotnet nuget locals all --list)
+          if ($LASTEXITCODE -ne 0) { throw 'NuGet location discovery failed.' }
+          $locals | Tee-Object (Join-Path $evidence 'nuget-effective.txt')
+          $paths = [ordered]@{
+            workspace = $env:GITHUB_WORKSPACE
+            temp = $env:RUNNER_TEMP
+            userProfile = $env:USERPROFILE
+          }
+          foreach ($line in $locals) {
+            if ($line -match '^([^:]+): (.+)$') { $paths[$Matches[1]] = $Matches[2] }
+          }
+          $resolvedPaths = foreach ($entry in $paths.GetEnumerator()) {
+            $path = [IO.Path]::GetFullPath($entry.Value)
+            $drive = [IO.Path]::GetPathRoot($path)
+            $volume = Get-Volume -DriveLetter $drive.Substring(0, 1)
+            $exists = Test-Path -LiteralPath $path
+            $entries = if ($exists) { @(Get-ChildItem -LiteralPath $path -Force).Count } else { 0 }
+            [ordered]@{
+              name = $entry.Key; path = $path; volume = $drive
+              fileSystem = $volume.FileSystemType.ToString()
+              exists = $exists
+              initialTopLevelEntries = $entries
+            }
+          }
+          $metadata = [ordered]@{
+            source = (git rev-parse HEAD)
+            location = $env:CACHE_LOCATION
+            trial = $env:TRIAL
+            cacheState = 'Fresh runner image; no Actions cache restored; pre-existing entries recorded'
+            imageOS = $env:ImageOS
+            imageVersion = $env:ImageVersion
+            runnerOS = $env:RUNNER_OS
+            runnerArchitecture = $env:RUNNER_ARCH
+            os = (Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture)
+            cpu = @(Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors)
+            disks = @(Get-Disk | Select-Object Number, FriendlyName, BusType, PartitionStyle, Size)
+            partitions = @(Get-Partition | Select-Object DiskNumber, PartitionNumber, DriveLetter, Size)
+            volumes = @(Get-Volume | Select-Object DriveLetter, FileSystemType, Size, SizeRemaining)
+            paths = @($resolvedPaths)
+            selectionSeconds = $selection.Elapsed.TotalSeconds
+          }
+          $metadata | ConvertTo-Json -Depth 8 | Tee-Object (Join-Path $evidence 'environment.json')
+
+      - name: Restore direct app for x64
+        shell: pwsh
+        run: |
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          dotnet restore windows\src\TinyClips.App\TinyClips.App.csproj `
+            -p:Configuration=Release `
+            -p:Platform=x64 `
+            -p:RuntimeIdentifier=win-x64 `
+            -p:TinyClipsDirectReleaseBuild=true
+          $exitCode = $LASTEXITCODE
+          $timer.Stop()
+          @{ restoreSeconds = $timer.Elapsed.TotalSeconds; exitCode = $exitCode } |
+            ConvertTo-Json | Set-Content (Join-Path $env:EVIDENCE 'restore.json')
+          if ($exitCode -ne 0) { throw 'Direct app restore failed.' }
+
+      - name: Build and inspect direct package for x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packageDirectory = Join-Path (Resolve-Path ".") "artifacts\direct-x64\"
+          New-Item -ItemType Directory -Force $packageDirectory | Out-Null
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          dotnet build windows\src\TinyClips.App\TinyClips.App.csproj `
+            -c Release `
+            -p:Platform=x64 `
+            -p:RuntimeIdentifier=win-x64 `
+            -p:TinyClipsDirectReleaseBuild=true `
+            -p:EnableMsixTooling=true `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageDir=$packageDirectory `
+            -p:AppxBundle=Never `
+            -p:UapAppxPackageBuildMode=SideloadOnly `
+            -p:AppxPackageSigningEnabled=false `
+            -p:AppxSymbolPackageEnabled=false `
+            --no-restore `
+            -v:minimal
+          $exitCode = $LASTEXITCODE
+          $timer.Stop()
+          @{ buildPackageSeconds = $timer.Elapsed.TotalSeconds; exitCode = $exitCode } |
+            ConvertTo-Json | Set-Content (Join-Path $env:EVIDENCE 'build.json')
+          if ($exitCode -ne 0) { throw "Direct package build failed." }
+          $msix = Get-ChildItem $packageDirectory -Recurse -Filter *.msix |
+            Where-Object { $_.Name -notmatch "symbols" } |
+            Select-Object -First 1
+          if (-not $msix) { throw "Direct package build produced no MSIX." }
+          $timer.Restart()
+          & windows\packaging\Assert-DirectPackage.ps1 -MsixPath $msix.FullName -Architecture x64
+          $timer.Stop()
+          @{ inspectionSeconds = $timer.Elapsed.TotalSeconds } |
+            ConvertTo-Json | Set-Content (Join-Path $env:EVIDENCE 'inspection.json')
+
+      - name: Upload timing and environment evidence only
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: nuget-location-${{ matrix.location }}-${{ matrix.trial }}
+          path: ${{ runner.temp }}\nuget-location-evidence
+          retention-days: 14
+          if-no-files-found: error
