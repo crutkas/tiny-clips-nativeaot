@@ -34,6 +34,7 @@
     <EmbeddedResource Include="..\..\src\TinyClips.App\Package.Store.appxmanifest" Link="Manifests\Package.Store.appxmanifest" LogicalName="PackageManifest.Package.Store.appxmanifest" />
     <!-- How wide the tray popup is for three capture tiles and for four. -->
     <Compile Include="..\..\src\TinyClips.App\Infrastructure\TrayPopupLayout.cs" Link="TrayPopupLayout.cs" />
+    <Compile Include="..\..\src\TinyClips.App\Infrastructure\CaptureVisibilityPolicy.cs" Link="CaptureVisibilityPolicy.cs" />
     <!-- When a row of Studio buttons shows the glyphs before their words. -->
     <Compile Include="..\..\src\TinyClips.App\Controls\Studio\StudioGlyphRowLayout.cs" Link="Studio\StudioGlyphRowLayout.cs" />
     <!--

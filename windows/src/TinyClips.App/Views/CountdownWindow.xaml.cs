@@ -12,9 +12,8 @@ namespace TinyClips.App;
 /// <summary>
 /// A borderless, always-on-top countdown card shown before a capture begins. Counts down
 /// from the requested number of seconds and completes once it reaches zero. The window is
-/// clipped to a rounded shape (matching the card) and excluded from screen capture so it never
-/// appears in a recording, and it hides itself before the countdown task completes so recording
-/// starts on a clean frame.
+/// clipped to a rounded shape (matching the card). Capture visibility follows the session's
+/// inclusion preference; its fade-out overlaps the beginning of recording.
 /// </summary>
 public sealed partial class CountdownWindow : Window
 {
@@ -29,6 +28,7 @@ public sealed partial class CountdownWindow : Window
     private CountdownWindow(int seconds)
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         _remaining = Math.Max(1, seconds);
         CountText.Text = _remaining.ToString();
@@ -75,9 +75,7 @@ public sealed partial class CountdownWindow : Window
             _timer.Stop();
             _timer.Tick -= OnTick;
 
-            // The card is excluded from capture (WDA_EXCLUDEFROMCAPTURE), so it can never land in
-            // the recording; signal completion immediately and let the fade-out run concurrently
-            // with recording start instead of adding ~220 ms of dead time after "1".
+            // Let the fade-out overlap recording start instead of adding dead time after "1".
             if (_isCancelled)
             {
                 return;
@@ -195,10 +193,8 @@ public sealed partial class CountdownWindow : Window
         var y = work.Y + ((work.Height - size) / 2);
         AppWindow.MoveAndResize(AppWindowPlacement.ClampToWorkArea(work, x, y, size, size));
 
-        // Clip the square window to a rounded square (matching the card) and keep it
-        // out of recordings.
+        // Clip the square window to a rounded square matching the card.
         OverlayWindowHelpers.ApplyRoundedRegion(hwnd, size, size, target.Scale, CornerRadiusDip);
-        OverlayWindowHelpers.ExcludeFromCapture(hwnd);
     }
 
 }

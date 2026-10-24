@@ -73,6 +73,7 @@ public sealed partial class RecordingSetupWindow : Window
         bool isStudioRecording)
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         _captureType = captureType;
         _audioDevices = audioDevices;
@@ -224,7 +225,6 @@ public sealed partial class RecordingSetupWindow : Window
         RootGrid.Focus(FocusState.Programmatic);
 
         var hwnd = WindowNative.GetWindowHandle(this);
-        OverlayWindowHelpers.ExcludeFromCapture(hwnd);
     }
 
     private void PositionNearMonitorWorkArea(MonitorInfo? monitor, PixelRect? regionInVirtualDesktop)

@@ -30,6 +30,7 @@ public sealed partial class OnboardingWindow : Window
         _settings = App.Services.GetRequiredService<ICaptureSettings>();
 
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);

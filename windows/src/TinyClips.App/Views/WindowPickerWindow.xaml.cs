@@ -26,6 +26,7 @@ public sealed partial class WindowPickerWindow : Window
     private WindowPickerWindow()
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
         ConfigurePresenter();
         RootGrid.KeyDown += OnKeyDown;
         Activated += OnActivated;

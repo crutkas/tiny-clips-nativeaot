@@ -41,6 +41,7 @@ public sealed partial class WebcamPreviewWindow : Window
         Action<WebcamCornerPosition> cornerChanged)
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this, alwaysExcluded: true);
         _capture = capture;
         _captureBounds = ResolveCaptureBounds(target, monitor, regionInVirtualDesktop);
         _corner = corner;

@@ -29,6 +29,7 @@ public sealed partial class ScrollingCaptureWindow : Window
     public ScrollingCaptureWindow()
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         var presenter = OverlappedPresenter.CreateForContextMenu();
         presenter.IsAlwaysOnTop = true;
@@ -53,7 +54,6 @@ public sealed partial class ScrollingCaptureWindow : Window
         Activate();
 
         var hwnd = WindowNative.GetWindowHandle(this);
-        OverlayWindowHelpers.ExcludeFromCapture(hwnd);
         PulseStoryboard.Begin();
     }
 

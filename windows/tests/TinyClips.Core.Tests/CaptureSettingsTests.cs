@@ -6,6 +6,21 @@ namespace TinyClips.Core.Tests;
 public sealed class CaptureSettingsTests
 {
     [Fact]
+    public void IncludeTinyClips_DefaultsOff_PersistsAcrossInstances_AndResets()
+    {
+        var store = new TestSettingsService();
+        var settings = new CaptureSettings(store);
+        Assert.False(settings.IncludeTinyClipsInCapture);
+        settings.IncludeTinyClipsInCapture = true;
+        Assert.True(new CaptureSettings(store).IncludeTinyClipsInCapture);
+        settings.IncludeTinyClipsInCapture = false;
+        Assert.False(new CaptureSettings(store).IncludeTinyClipsInCapture);
+        settings.IncludeTinyClipsInCapture = true;
+        settings.ResetToDefaults();
+        Assert.False(settings.IncludeTinyClipsInCapture);
+    }
+
+    [Fact]
     public void Defaults_ReturnDocumentedValues()
     {
         var settingsService = new TestSettingsService();

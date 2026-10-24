@@ -56,6 +56,7 @@ public sealed partial class VideoTrimmerWindow : Window
         _filePath = filePath;
 
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         // Default to 1x (the "1x" preset item).
         SpeedCombo.SelectedIndex = 4;

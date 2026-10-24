@@ -26,6 +26,7 @@ public sealed partial class WhatsNewWindow : Window
         ViewModel = new WhatsNewViewModel(_settings);
 
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);

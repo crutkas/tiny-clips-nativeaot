@@ -28,6 +28,7 @@ public sealed partial class ScreenPickerWindow : Window
     private ScreenPickerWindow(IReadOnlyList<MonitorInfo> monitors)
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
         ConfigurePresenter();
         RootGrid.KeyDown += OnKeyDown;
         Activated += OnActivated;

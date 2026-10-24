@@ -45,6 +45,7 @@ public sealed partial class CapturePickerWindow : Window
     private CapturePickerWindow()
     {
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         BuildTimerFlyout();
         BuildLimitFlyout();
@@ -52,7 +53,6 @@ public sealed partial class CapturePickerWindow : Window
         _dragger = new FloatingWindowDragger(AppWindow);
 
         ConfigurePresenter();
-        OverlayWindowHelpers.ExcludeFromCapture(WinRT.Interop.WindowNative.GetWindowHandle(this));
 
         RootGrid.KeyDown += OnKeyDown;
         Activated += OnActivated;

@@ -45,12 +45,11 @@ public sealed partial class RegionSelectWindow : Window
         _onComplete = onComplete;
 
         InitializeComponent();
+        WindowCaptureVisibility.Register(this);
 
         ConfigurePresenter();
         _hwnd = WindowNative.GetWindowHandle(this);
         SetWindowAlpha(_hwnd, 0);
-        // Keep the overlay itself out of any capture that runs while it is (or was just) visible.
-        OverlayWindowHelpers.ExcludeFromCapture(_hwnd);
         AppWindow.Move(new PointInt32(monitor.X, monitor.Y));
         AppWindow.Resize(new SizeInt32(monitor.Width, monitor.Height));
 
