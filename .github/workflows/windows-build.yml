@@ -7,6 +7,10 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   changes:
     name: Detect Windows changes
@@ -138,15 +142,24 @@ jobs:
     runs-on: windows-latest
     needs: [changes, build, store-build]
     if: ${{ needs.changes.outputs.windows == 'true' }}
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Setup .NET SDK
+        id: dotnet
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-v1-${{ runner.os }}-${{ runner.arch }}-tests-win-x64-sdk-${{ steps.dotnet.outputs.dotnet-version }}-${{ hashFiles('global.json', 'windows/**/*.csproj', 'windows/**/*.props', 'windows/**/*.targets', 'windows/**/*.pubxml', 'windows/**/packages.lock.json', '**/[Nn]u[Gg]et.[Cc]onfig') }}
 
       - name: Restore test project
         run: dotnet restore windows/tests/TinyClips.Core.Tests/TinyClips.Core.Tests.csproj
