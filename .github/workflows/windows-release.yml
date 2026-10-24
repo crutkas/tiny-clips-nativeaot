@@ -37,6 +37,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Place NuGet caches in runner temp
+        if: runner.os == 'Windows' && runner.environment == 'github-hosted'
+        shell: pwsh
+        run: |
+          $packages = Join-Path $env:RUNNER_TEMP 'nuget\packages'
+          $httpCache = Join-Path $env:RUNNER_TEMP 'nuget\http-cache'
+          New-Item -ItemType Directory -Force -Path $packages, $httpCache | Out-Null
+          "NUGET_PACKAGES=$packages" >> $env:GITHUB_ENV
+          "NUGET_HTTP_CACHE_PATH=$httpCache" >> $env:GITHUB_ENV
+
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
         with:
